@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200">
+  <!-- Background circle with jungle green -->
+  <circle cx="100" cy="100" r="95" fill="#2d5016"/>
+  
+  <!-- Head -->
+  <circle cx="100" cy="85" r="45" fill="#d4a574"/>
+  
+  <!-- Hair - messy jungle boy style -->
+  <path d="M 60 65 Q 50 45 70 35 Q 85 25 100 22 Q 115 25 130 35 Q 150 45 140 65 Z" fill="#3d2817"/>
+  
+  <!-- Hair strands -->
+  <path d="M 70 40 Q 75 30 80 35" stroke="#3d2817" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 100 25 L 100 35" stroke="#3d2817" stroke-width="2" stroke-linecap="round"/>
+  <path d="M 125 40 Q 120 30 115 35" stroke="#3d2817" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Eyes -->
+  <circle cx="80" cy="80" r="8" fill="#2d2d2d"/>
+  <circle cx="120" cy="80" r="8" fill="#2d2d2d"/>
+  <circle cx="82" cy="78" r="3" fill="#ffffff"/>
+  <circle cx="122" cy="78" r="3" fill="#ffffff"/>
+  
+  <!-- Determined expression - eyebrows -->
+  <path d="M 72 72 Q 80 70 87 72" stroke="#3d2817" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M 113 72 Q 120 70 128 72" stroke="#3d2817" stroke-width="2" fill="none" stroke-linecap="round"/>
+  
+  <!-- Nose -->
+  <path d="M 100 85 L 100 95" stroke="#a67c52" stroke-width="2" stroke-linecap="round"/>
+  
+  <!-- Mouth - confident smile -->
+  <path d="M 85 105 Q 100 115 115 105" stroke="#8b4513" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  
+  <!-- Neck -->
+  <rect x="88" y="125" width="24" height="15" fill="#d4a574"/>
+  
+  <!-- Jungle vines around head -->
+  <path d="M 55 90 Q 45 100 50 115" stroke="#4a7c2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M 145 95 Q 155 105 150 120" stroke="#4a7c2e" stroke-width="3" fill="none" stroke-linecap="round"/>
+  
+  <!-- Small leaves -->
+  <ellipse cx="48" cy="105" rx="4" ry="6" fill="#5a9c3a" transform="rotate(-30 48 105)"/>
+  <ellipse cx="152" cy="110" rx="4" ry="6" fill="#5a9c3a" transform="rotate(30 152 110)"/>
+  
+  <!-- Adventurous spirit - small tiger/leopard spot on cheek -->
+  <ellipse cx="65" cy="95" rx="3" ry="5" fill="#b8860b" opacity="0.6"/>
+</svg>
