@@ -73,6 +73,19 @@ export interface Particle {
   type: 'leaf' | 'sparkle' | 'dust' | 'splash';
 }
 
+export interface PuzzleQuestion {
+  question: string;
+  choices: string[];
+  correctIndex: number;
+}
+
+export interface PuzzleGate {
+  triggerX: number; // invisible wall x-position blocking progress until solved
+  title: string;
+  intro: string;
+  questions: PuzzleQuestion[];
+}
+
 export interface Level {
   id: number;
   name: string;
@@ -86,6 +99,7 @@ export interface Level {
   collectibles: Collectible[];
   timeLimit?: number; // seconds for timed levels
   collectibleBonusSeconds?: number; // default extra seconds per collectible on timed levels
+  puzzle?: PuzzleGate;
 }
 
 export interface GameSettings {
