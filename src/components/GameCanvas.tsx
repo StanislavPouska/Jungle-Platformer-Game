@@ -7,6 +7,29 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Player, Platform, Toad, Collectible, Particle, Level, GameSettings, GameStats } from '../types';
 import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
+import { Lang, UI, getLevelText, getPuzzleText } from '../i18n';
+
+// Scans a level's platforms/toads/collectibles to find the vertical extent
+// of playable content, so the camera knows how far it may safely scroll.
+const computeVerticalBounds = (level: Level) => {
+  let minY = Math.min(level.startY, level.endY);
+  let maxY = Math.max(level.startY, level.endY);
+  level.platforms.forEach((plat) => {
+    const topRange = plat.moving ? (plat.startY ?? plat.y) - (plat.range ?? 0) : plat.y;
+    const bottomRange = plat.moving ? (plat.startY ?? plat.y) + (plat.range ?? 0) : plat.y;
+    minY = Math.min(minY, topRange);
+    maxY = Math.max(maxY, bottomRange + plat.height);
+  });
+  level.toads.forEach((toad) => {
+    minY = Math.min(minY, toad.y);
+    maxY = Math.max(maxY, toad.y + toad.height);
+  });
+  level.collectibles.forEach((col) => {
+    minY = Math.min(minY, col.y);
+    maxY = Math.max(maxY, col.y);
+  });
+  return { minY, maxY };
+};
 
 interface GameCanvasProps {
   level: Level;
@@ -15,6 +38,9 @@ interface GameCanvasProps {
   onStatsChange: (newStats: GameStats | ((prev: GameStats) => GameStats)) => void;
   onNextLevel: () => void;
   onRestartLevel: () => void;
+  paused: boolean;
+  onTogglePause: () => void;
+  language: Lang;
 }
 
 export default function GameCanvas({
@@ -24,12 +50,23 @@ export default function GameCanvas({
   onStatsChange,
   onNextLevel,
   onRestartLevel,
+  paused,
+  onTogglePause,
+  language,
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  
+  const t = UI[language];
+  const levelText = getLevelText(level, language);
+  const puzzleText = level.puzzle ? getPuzzleText(level.puzzle, language) : null;
+
   // Game state controls
-  const [isPaused, setIsPaused] = useState(false);
   const [controlsPrompt, setControlsPrompt] = useState(true);
+
+  // Puzzle gate (quiz wall) UI state
+  const [showPuzzle, setShowPuzzle] = useState(false);
+  const [puzzleAnswers, setPuzzleAnswers] = useState<number[]>([]);
+  const [puzzleFeedback, setPuzzleFeedback] = useState<'idle' | 'wrong'>('idle');
+  const puzzleOpenedRef = useRef(false);
 
   // References for mutable frame-loop states (prevents React re-render lag)
   const stateRef = useRef({
@@ -55,6 +92,9 @@ export default function GameCanvas({
     collectibles: JSON.parse(JSON.stringify(level.collectibles)) as Collectible[],
     particles: [] as Particle[],
     cameraX: 0,
+    cameraY: 0,
+    worldMinY: computeVerticalBounds(level).minY,
+    worldMaxY: computeVerticalBounds(level).maxY,
     keys: {} as { [key: string]: boolean },
     frameId: 0,
     lastTime: 0,
@@ -65,6 +105,8 @@ export default function GameCanvas({
     victoryTimer: 0,
     isMuted: false,
     groundedPlatformId: null as string | null,
+    puzzleSolved: false,
+    puzzleHit: false,
   });
 
   // Keep volumes synced with audioSynth
@@ -93,12 +135,22 @@ export default function GameCanvas({
     s.collectibles = JSON.parse(JSON.stringify(level.collectibles));
     s.particles = [];
     s.cameraX = 0;
+    s.cameraY = 0;
+    const verticalBounds = computeVerticalBounds(level);
+    s.worldMinY = verticalBounds.minY;
+    s.worldMaxY = verticalBounds.maxY;
     s.keys = {};
     s.timeRemaining = level.timeLimit ?? 0;
     s.timeExpired = false;
     s.deathTimer = 0;
     s.victoryTimer = 0;
     s.groundedPlatformId = null;
+    s.puzzleSolved = false;
+    s.puzzleHit = false;
+    puzzleOpenedRef.current = false;
+    setShowPuzzle(false);
+    setPuzzleFeedback('idle');
+    setPuzzleAnswers(level.puzzle ? new Array(level.puzzle.questions.length).fill(-1) : []);
 
     // Start background music loop
     audioSynth.startJungleMusic();
@@ -165,7 +217,7 @@ export default function GameCanvas({
       if (s.particles.length < 40 && Math.random() < 0.08) {
         s.particles.push({
           x: s.cameraX + Math.random() * canvas.width + 100,
-          y: -10,
+          y: s.cameraY - 10,
           vx: -0.5 - Math.random() * 1.5,
           vy: 0.5 + Math.random() * 1.5,
           size: 4 + Math.random() * 6,
@@ -178,17 +230,23 @@ export default function GameCanvas({
     };
 
     const loop = (timestamp: number) => {
-      if (isPaused) {
+      if (paused) {
         // Render pause message
         ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
         ctx.fillRect(0, 0, canvas.width, canvas.height);
         ctx.font = 'bold 24px sans-serif';
         ctx.fillStyle = '#10b981';
         ctx.textAlign = 'center';
-        ctx.fillText('GAME PAUSED', canvas.width / 2, canvas.height / 2 - 10);
+        ctx.fillText(t.canvasGamePaused, canvas.width / 2, canvas.height / 2 - 10);
         ctx.font = '14px monospace';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText('Press Pause button or play/resume to continue', canvas.width / 2, canvas.height / 2 + 25);
+        ctx.fillText(t.canvasPausedHint, canvas.width / 2, canvas.height / 2 + 25);
+        return;
+      }
+
+      if (showPuzzle) {
+        // Freeze the frame behind the quiz modal — no physics/timer ticking
+        // while the riddle gate is open.
         return;
       }
 
@@ -224,6 +282,13 @@ export default function GameCanvas({
       // COLLISION SYSTEMS
       resolveCollisions(s);
 
+      // RIDDLE GATE: open the quiz overlay the first time the player bumps
+      // into an unsolved puzzle wall
+      if (s.puzzleHit && !puzzleOpenedRef.current) {
+        puzzleOpenedRef.current = true;
+        setShowPuzzle(true);
+      }
+
       // AUDIO TRIGGER SAFETY
       // (Resume context if active input or clicks occur)
       if (s.keys[' '] || s.keys['a'] || s.keys['d'] || s.keys['w'] || s.keys['s']) {
@@ -244,7 +309,7 @@ export default function GameCanvas({
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', resizeCanvas);
     };
-  }, [level, isPaused, settings]);
+  }, [level, paused, settings, showPuzzle, language]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
@@ -406,6 +471,13 @@ export default function GameCanvas({
     if (p.x > s.levelLength - 100) {
       p.x = s.levelLength - 100;
       p.vx = 0;
+    }
+
+    // Riddle Gate: invisible wall blocks progress until the quiz is solved
+    if (level.puzzle && !s.puzzleSolved && p.x + p.width > level.puzzle.triggerX) {
+      p.x = level.puzzle.triggerX - p.width;
+      if (p.vx > 0) p.vx = 0;
+      s.puzzleHit = true;
     }
 
     // Moving Platform horizontal & vertical updates
@@ -622,6 +694,14 @@ export default function GameCanvas({
     const maxScroll = s.levelLength - canvas.width;
     s.cameraX = Math.max(0, Math.min(maxScroll, optimalCamX));
 
+    // Vertical follow: keep the player roughly centered, but never scroll
+    // past the level's actual playable vertical extent (so platforms near
+    // the bottom of tall levels stay on-screen instead of being clipped).
+    const optimalCamY = p.y - canvas.height / 2.2;
+    const minScrollY = Math.min(0, s.worldMinY - 80);
+    const maxScrollY = Math.max(0, s.worldMaxY + 80 - canvas.height);
+    s.cameraY = Math.max(minScrollY, Math.min(maxScrollY, optimalCamY));
+
     // Clear background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -670,7 +750,7 @@ export default function GameCanvas({
 
     // Translate coordinates so everything slides with camera
     ctx.save();
-    ctx.translate(-s.cameraX, 0);
+    ctx.translate(-s.cameraX, -s.cameraY);
 
     // 3. Draw Platforms
     s.platforms.forEach((plat: Platform) => {
@@ -911,7 +991,7 @@ export default function GameCanvas({
     ctx.fillStyle = '#f472b6';
     ctx.font = 'bold 10px monospace';
     ctx.textAlign = 'center';
-    ctx.fillText('SAFETY GATE', portalX, portalY - 48);
+    ctx.fillText(t.canvasSafetyGate, portalX, portalY - 48);
 
     // 7. Draw MOWGLI character!
     if (s.deathTimer === 0) {
@@ -961,8 +1041,8 @@ export default function GameCanvas({
       ctx.font = '11px monospace';
       ctx.fillStyle = '#2dd4bf';
       ctx.textAlign = 'left';
-      ctx.fillText('◄ A / D ► : Run Left/Right', 24, 28);
-      ctx.fillText('▲ SPACE / W  : Jump Canopy', 24, 44);
+      ctx.fillText(t.canvasTipMove, 24, 28);
+      ctx.fillText(t.canvasTipJump, 24, 44);
     }
 
     if (level.timeLimit !== undefined) {
@@ -975,7 +1055,7 @@ export default function GameCanvas({
       ctx.font = 'bold 16px monospace';
       ctx.fillStyle = timeColor;
       ctx.textAlign = 'right';
-      const timeText = `TIME: ${Math.max(0, Math.ceil(s.timeRemaining))}s`;
+      const timeText = `${t.canvasTime} ${Math.max(0, Math.ceil(s.timeRemaining))}s`;
       ctx.fillText(timeText, canvas.width - 18, 36);
     }
   };
@@ -1181,6 +1261,39 @@ export default function GameCanvas({
     }
   };
 
+  // Riddle Gate quiz interactions
+  const handlePuzzleChoice = (questionIdx: number, choiceIdx: number) => {
+    setPuzzleAnswers((prev) => {
+      const next = [...prev];
+      next[questionIdx] = choiceIdx;
+      return next;
+    });
+    setPuzzleFeedback('idle');
+  };
+
+  const handlePuzzleSubmit = () => {
+    if (!level.puzzle) return;
+    const allCorrect = level.puzzle.questions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
+    const s = stateRef.current;
+
+    if (allCorrect) {
+      s.puzzleSolved = true;
+      setShowPuzzle(false);
+      setPuzzleFeedback('idle');
+      audioSynth.playLevelSuccess();
+      if (level.timeLimit !== undefined) {
+        s.timeRemaining += 5; // reward bonus time for solving the riddle
+      }
+      onStatsChange((prev: GameStats) => ({ ...prev, score: prev.score + 50 }));
+    } else {
+      setPuzzleFeedback('wrong');
+      audioSynth.playWrongAnswer();
+      if (level.timeLimit !== undefined) {
+        s.timeRemaining = Math.max(1, s.timeRemaining - 3); // small penalty, never zeroes the clock outright
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden" id="gamer-box">
       
@@ -1188,7 +1301,7 @@ export default function GameCanvas({
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-emerald-400" />
-          <span className="text-emerald-300 font-bold uppercase tracking-wider">{level.name}</span>
+          <span className="text-emerald-300 font-bold uppercase tracking-wider">{levelText.name}</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="flex items-center gap-1">
@@ -1196,11 +1309,12 @@ export default function GameCanvas({
             <span className="text-amber-300 font-semibold">{stats.score} XP</span>
           </span>
           <button
-            onClick={() => setIsPaused(!isPaused)}
+            onClick={onTogglePause}
             className="px-2.5 py-1 text-[11px] bg-slate-800 hover:bg-slate-700 text-gray-300 rounded-md border border-slate-700 cursor-pointer"
             id="btn-pause-toggle"
+            title={t.pauseTooltip}
           >
-            {isPaused ? 'Resume' : 'Pause'}
+            {paused ? t.resume : t.pause}
           </button>
         </div>
       </div>
@@ -1210,7 +1324,7 @@ export default function GameCanvas({
         <canvas
           ref={canvasRef}
           className="w-full block h-[420px] bg-slate-900 cursor-crosshair"
-          title="Mowgli platformer loop screen"
+          title={t.canvasTitle}
           id="jungle-platformer-canvas"
         />
 
@@ -1218,10 +1332,10 @@ export default function GameCanvas({
         <button
           onClick={() => setControlsPrompt(!controlsPrompt)}
           className="absolute top-3 right-3 p-1.5 bg-slate-900/80 hover:bg-slate-800 text-gray-400 hover:text-white rounded-lg border border-slate-800 transition-colors text-[10px] uppercase tracking-wider cursor-pointer"
-          title="Toggle overlay controls prompt info"
+          title={t.tipsToggleTooltip}
           id="btn-toggle-tips"
         >
-          {controlsPrompt ? 'Hide Tips' : 'Show Keys'}
+          {controlsPrompt ? t.hideTips : t.showKeys}
         </button>
 
         {/* Level completed screen */}
@@ -1230,9 +1344,9 @@ export default function GameCanvas({
             <div className="animate-bounce mb-3 bg-emerald-500/20 p-3 rounded-full border border-emerald-500/50">
               <Trophy className="w-12 h-12 text-yellow-400" />
             </div>
-            <h2 className="text-2xl font-black text-emerald-400 uppercase tracking-widest font-sans">Level Complete!</h2>
+            <h2 className="text-2xl font-black text-emerald-400 uppercase tracking-widest font-sans">{t.levelCompleteTitle}</h2>
             <p className="text-sm text-gray-300 max-w-sm mt-2 mb-6 font-mono font-medium">
-              Excellent jumps! Mowgli found the Safety Gate. +150 Completion Points awarded!
+              {t.levelCompleteBody}
             </p>
             <div className="flex gap-4">
               <button
@@ -1241,7 +1355,7 @@ export default function GameCanvas({
                 id="btn-replay-complete"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>Replay Stage</span>
+                <span>{t.replayStage}</span>
               </button>
               <button
                 onClick={onNextLevel}
@@ -1249,7 +1363,7 @@ export default function GameCanvas({
                 id="btn-next-complete"
               >
                 <Play className="w-4 h-4" />
-                <span>Next Stage ➔</span>
+                <span>{t.nextStage}</span>
               </button>
             </div>
           </div>
@@ -1261,9 +1375,9 @@ export default function GameCanvas({
             <div className="animate-pulse mb-3 bg-rose-500/20 p-3 rounded-full border border-rose-500/40">
               <PlayCircle className="w-12 h-12 text-rose-400" />
             </div>
-            <h2 className="text-2xl font-black text-rose-400 uppercase tracking-widest font-sans">Time's Up!</h2>
+            <h2 className="text-2xl font-black text-rose-400 uppercase tracking-widest font-sans">{t.timesUpTitle}</h2>
             <p className="text-sm text-gray-300 max-w-sm mt-2 mb-6 font-mono font-medium">
-              The jungle clock ran out. Collectibles add extra seconds on timed stages — try again fast and grab the bonuses.
+              {t.timesUpBody}
             </p>
             <div className="flex gap-4">
               <button
@@ -1272,7 +1386,60 @@ export default function GameCanvas({
                 id="btn-restart-timeout"
               >
                 <RotateCcw className="w-4 h-4" />
-                <span>Restart Stage</span>
+                <span>{t.restartStage}</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Riddle Gate quiz overlay */}
+        {showPuzzle && level.puzzle && puzzleText && (
+          <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center p-5 text-center select-none backdrop-blur-sm z-20 overflow-y-auto" id="puzzle-gate-modal">
+            <div className="w-full max-w-md space-y-4 my-auto py-2">
+              <h2 className="text-lg font-black text-amber-300 uppercase tracking-wide font-sans">{puzzleText.title}</h2>
+              <p className="text-xs text-gray-300 leading-relaxed">{puzzleText.intro}</p>
+
+              <div className="space-y-3 text-left">
+                {puzzleText.questions.map((q, qIdx) => (
+                  <div key={qIdx} className="bg-[#1d0735]/80 border border-amber-500/25 rounded-xl p-3" id={`puzzle-q-${qIdx}`}>
+                    <p className="text-xs font-bold text-white mb-2">{qIdx + 1}. {q.question}</p>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {q.choices.map((choice, cIdx) => (
+                        <button
+                          key={cIdx}
+                          onClick={() => handlePuzzleChoice(qIdx, cIdx)}
+                          className={`text-left text-[11px] px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
+                            puzzleAnswers[qIdx] === cIdx
+                              ? 'bg-amber-500/30 border-amber-400 text-amber-100 font-bold'
+                              : 'bg-slate-900/60 border-slate-700 text-gray-300 hover:bg-slate-800'
+                          }`}
+                          id={`puzzle-q-${qIdx}-choice-${cIdx}`}
+                        >
+                          {choice}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {puzzleFeedback === 'wrong' && (
+                <p className="text-xs font-bold text-rose-400" id="puzzle-feedback-wrong">
+                  {t.wrongFeedback}
+                </p>
+              )}
+
+              <button
+                onClick={handlePuzzleSubmit}
+                disabled={puzzleAnswers.some((a) => a === -1)}
+                className={`w-full font-bold text-sm px-6 py-2.5 rounded-xl border cursor-pointer ${
+                  puzzleAnswers.some((a) => a === -1)
+                    ? 'bg-slate-800 text-gray-500 border-slate-700 cursor-not-allowed'
+                    : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-lg'
+                }`}
+                id="btn-puzzle-submit"
+              >
+                {t.answerRiddle}
               </button>
             </div>
           </div>
@@ -1291,7 +1458,7 @@ export default function GameCanvas({
             onTouchStart={() => pressKeyboardSim('a', true)}
             onTouchEnd={() => pressKeyboardSim('a', false)}
             className="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 text-gray-200 hover:text-white rounded-2xl flex items-center justify-center text-xl font-black border-2 border-slate-700/80 active:scale-95 transition-transform touch-none select-none"
-            title="Move left"
+            title={t.moveLeft}
             id="touch-left"
           >
             ◀
@@ -1303,7 +1470,7 @@ export default function GameCanvas({
             onTouchStart={() => pressKeyboardSim('d', true)}
             onTouchEnd={() => pressKeyboardSim('d', false)}
             className="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 text-gray-200 hover:text-white rounded-2xl flex items-center justify-center text-xl font-black border-2 border-slate-700/80 active:scale-95 transition-transform touch-none"
-            title="Move right"
+            title={t.moveRight}
             id="touch-right"
           >
             ▶
@@ -1319,12 +1486,12 @@ export default function GameCanvas({
             onTouchStart={() => pressKeyboardSim('s', true)}
             onTouchEnd={() => pressKeyboardSim('s', false)}
             className="w-14 h-14 bg-slate-800/80 hover:bg-slate-700 text-gray-300 hover:text-white rounded-2xl flex items-center justify-center text-xs font-mono border-2 border-slate-700/80 active:scale-95 transition-transform touch-none"
-            title="Crouch / Drop"
+            title={t.crouchDrop}
             id="touch-crouch"
           >
-            DOWN
+            {t.downLabel}
           </button>
-          
+
           <button
             onMouseDown={() => pressKeyboardSim(' ', true)}
             onMouseUp={() => pressKeyboardSim(' ', false)}
@@ -1332,10 +1499,10 @@ export default function GameCanvas({
             onTouchStart={() => pressKeyboardSim(' ', true)}
             onTouchEnd={() => pressKeyboardSim(' ', false)}
             className="px-8 h-14 bg-emerald-600 hover:bg-emerald-500 text-white rounded-2xl flex items-center justify-center text-sm font-black tracking-wider border-2 border-emerald-500 active:scale-95 transition-transform shadow-lg shadow-emerald-950/20 touch-none uppercase"
-            title="Spring jump"
+            title={t.springJumpTooltip}
             id="touch-jump"
           >
-            Spring JUMP
+            {t.springJumpLabel}
           </button>
         </div>
 

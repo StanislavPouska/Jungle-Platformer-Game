@@ -73,6 +73,19 @@ export interface Particle {
   type: 'leaf' | 'sparkle' | 'dust' | 'splash';
 }
 
+export interface PuzzleQuestion {
+  question: string;
+  choices: string[];
+  correctIndex: number;
+}
+
+export interface PuzzleGate {
+  triggerX: number; // invisible wall x-position blocking progress until solved
+  title: string;
+  intro: string;
+  questions: PuzzleQuestion[];
+}
+
 export interface Level {
   id: number;
   name: string;
@@ -86,6 +99,64 @@ export interface Level {
   collectibles: Collectible[];
   timeLimit?: number; // seconds for timed levels
   collectibleBonusSeconds?: number; // default extra seconds per collectible on timed levels
+  puzzle?: PuzzleGate;
+}
+
+// --- Prologue: a stealth/crawling intro stage with its own simplified
+// movement model (no gravity or jumping — the toddler Mowgli auto-climbs
+// small steps between ground segments and hides from a patrolling tiger).
+
+export interface StepPlatform {
+  id: string;
+  x: number;
+  width: number;
+  y: number; // ground surface the player/tiger walk on
+  height: number; // visual thickness; also the max climbable step delta
+}
+
+export interface HidingSpot {
+  id: string;
+  x: number;
+  y: number; // matches the surface y of the platform it sits on
+  width: number;
+  height: number;
+  kind: 'cave' | 'leaf_shadow' | 'goal_cave';
+}
+
+export interface PrologueLevel {
+  name: string;
+  description: string;
+  startX: number;
+  levelMinX: number;
+  levelMaxX: number;
+  platforms: StepPlatform[];
+  hidingSpots: HidingSpot[];
+  goalSpotId: string;
+  tigerStartX: number;
+  tigerSpeed: number;
+}
+
+// --- Fighter minigame: a config-driven 1v1 arena fight. A level (or a
+// standalone stage like the Epilogue) supplies the opponent's visuals,
+// HP, damage, and parry chance; Mowgli's stats default to 100 HP / 20 dmg.
+
+export type FighterSpriteId = 'mowgli_torch' | 'shere_khan';
+export type FightBackgroundId = 'village';
+
+export interface FighterConfig {
+  sprite: FighterSpriteId;
+  maxHp: number;
+  damage: number;       // HP removed per landed hit
+  parryChance: number;  // 0..1 probability of auto-parrying an incoming hit (AI/opponent)
+}
+
+export interface FightConfig {
+  name: string;
+  description: string;
+  background: FightBackgroundId;
+  player: FighterConfig;   // Mowgli — defaults 100 HP / 20 dmg
+  opponent: FighterConfig; // input: visuals + HP + damage + parry chance
+  restartOnLose: boolean;  // Epilogue: retreat + speech bubble, then restart the fight
 }
 
 export interface GameSettings {

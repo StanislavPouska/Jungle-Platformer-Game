@@ -145,6 +145,32 @@ class AudioSynthEngine {
     }
   }
 
+  // Short buzz for an incorrect quiz answer
+  public playWrongAnswer() {
+    try {
+      this.initContext();
+      if (!this.ctx) return;
+
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+
+      osc.connect(gain);
+      gain.connect(this.ctx.destination);
+
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(180, this.ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 0.18);
+
+      gain.gain.setValueAtTime(this.sfxVol * 0.35, this.ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+
+      osc.start();
+      osc.stop(this.ctx.currentTime + 0.21);
+    } catch (e) {
+      console.warn('Wrong answer sound failed', e);
+    }
+  }
+
   // Pentatonic retro level complete fanfare
   public playLevelSuccess() {
     try {
