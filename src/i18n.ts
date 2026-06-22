@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Level, PuzzleGate } from './types';
+import { Level, PuzzleGate, PrologueLevel, FightConfig } from './types';
 
 export type Lang = 'en' | 'cs';
 
@@ -119,6 +119,30 @@ export const UI = {
     canvasTipJump: '▲ SPACE / W  : Jump Canopy',
     canvasTime: 'TIME:',
     canvasSafetyGate: 'SAFETY GATE',
+
+    // Prologue
+    prologueStage: 'PROLOGUE',
+    prologueHudHide: '▲ UP : Hide in shadow',
+    prologueHudLeave: '▼ DOWN : Leave hideout',
+    prologueHudMove: '◄ A / D ► : Crawl Left/Right',
+    prologueCaught: 'SHERE KHAN CAUGHT YOU!',
+    prologueCaughtHint: 'Hide in a cave or leaf-shadow before he passes',
+    prologueEscapedTitle: 'You Escaped!',
+    prologueEscapedBody: 'Shere Khan gave up the hunt and stalked away. Mowgli is safe in the wolf den... for now.',
+    prologueContinue: 'Continue ➔',
+    prologueSkipTooltip: 'Skip Prologue',
+
+    // Epilogue / fighter minigame
+    epilogueStage: 'EPILOGUE',
+    fighterMowgli: 'Mowgli',
+    fighterShereKhan: 'Shere Khan',
+    fighterHudMove: '◄ A / D ► : Move',
+    fighterHudAttack: '▲ UP : Attack',
+    fighterHudParry: '▼ DOWN : Parry (hold)',
+    fighterWinTitle: 'Victory!',
+    fighterWinBody: 'Shere Khan fled into the jungle, his tail ablaze. The man-cub has become a man. The End.',
+    fighterLoseBubble: "We'll finish this on some other day.",
+    fighterFinish: 'Finish ➔',
   },
   cs: {
     brandTag1: '2D BOČNÍ POHLED',
@@ -226,6 +250,30 @@ export const UI = {
     canvasTipJump: '▲ MEZERNÍK / W : Skok do Korun',
     canvasTime: 'ČAS:',
     canvasSafetyGate: 'BEZPEČNÁ BRÁNA',
+
+    // Prologue
+    prologueStage: 'PROLOG',
+    prologueHudHide: '▲ NAHORU : Schovat se ve stínu',
+    prologueHudLeave: '▼ DOLŮ : Vylézt z úkrytu',
+    prologueHudMove: '◄ A / D ► : Lézt Vlevo/Vpravo',
+    prologueCaught: 'ŠÉR CHÁN TĚ DOSTAL!',
+    prologueCaughtHint: 'Schovej se v jeskyni nebo ve stínu listu, než projde kolem',
+    prologueEscapedTitle: 'Útěk se podařil!',
+    prologueEscapedBody: 'Šér Chán to vzdal a odplížil se pryč. Mauglí je v doupěti vlků v bezpečí... zatím.',
+    prologueContinue: 'Pokračovat ➔',
+    prologueSkipTooltip: 'Přeskočit Prolog',
+
+    // Epilogue / fighter minigame
+    epilogueStage: 'EPILOG',
+    fighterMowgli: 'Mauglí',
+    fighterShereKhan: 'Šér Chán',
+    fighterHudMove: '◄ A / D ► : Pohyb',
+    fighterHudAttack: '▲ NAHORU : Útok',
+    fighterHudParry: '▼ DOLŮ : Kryt (podrž)',
+    fighterWinTitle: 'Vítězství!',
+    fighterWinBody: 'Šér Chán uprchl do džungle s hořícím ocasem. Z lidského mláděte se stal muž. Konec.',
+    fighterLoseBubble: 'Tohle dokončíme někdy jindy.',
+    fighterFinish: 'Dokončit ➔',
   },
 };
 
@@ -325,4 +373,24 @@ export function getPuzzleText(puzzle: PuzzleGate, lang: Lang): PuzzleTextOverrid
     intro: puzzle.intro,
     questions: puzzle.questions.map((q) => ({ question: q.question, choices: q.choices })),
   };
+}
+
+const PROLOGUE_TEXT_CS: LevelText = {
+  name: 'Útok Šér Chána',
+  description: 'Šér Chán napadl vesnici! Mauglí jako malé batole se musí proplížit džunglí, schovávat se v jeskyních a stínech listů před číhajícím tygrem.',
+};
+
+export function getPrologueText(prologue: PrologueLevel, lang: Lang): LevelText {
+  if (lang === 'cs') return PROLOGUE_TEXT_CS;
+  return { name: prologue.name, description: prologue.description };
+}
+
+const EPILOGUE_TEXT_CS: LevelText = {
+  name: 'Poslední Zúčtování',
+  description: 'O mnoho let později se dospělý Mauglí vrací do vesnice s ohněm v ruce. Šér Chán přichází na poslední souboj před zraky vesničanů. Ukonči to.',
+};
+
+export function getEpilogueText(fight: FightConfig, lang: Lang): LevelText {
+  if (lang === 'cs') return EPILOGUE_TEXT_CS;
+  return { name: fight.name, description: fight.description };
 }

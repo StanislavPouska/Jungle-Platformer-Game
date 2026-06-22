@@ -8,6 +8,10 @@ import { INITIAL_LEVELS, INITIAL_SETTINGS } from './data';
 import { GameStats, GameSettings, Level } from './types';
 import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
+import PrologueCanvas from './components/PrologueCanvas';
+import FighterCanvas from './components/FighterCanvas';
+import { PROLOGUE_LEVEL } from './prologueData';
+import { EPILOGUE_FIGHT } from './fighterData';
 import {
   Trees,
   HelpCircle,
@@ -18,10 +22,12 @@ import {
   TrendingUp,
   Sparkles,
   Info,
-  Menu as MenuIcon
+  Menu as MenuIcon,
+  Skull,
+  Swords
 } from 'lucide-react';
 import { audioSynth } from './audio';
-import { Lang, UI, getLevelText } from './i18n';
+import { Lang, UI, getLevelText, getPrologueText, getEpilogueText } from './i18n';
 
 const SAVE_KEY = 'jungle-platformer-save-v1';
 const LANG_KEY = 'jungle-platformer-lang';
@@ -70,10 +76,14 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveData, setSaveData] = useState<SaveData | null>(() => readSaveData());
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
+  const [showPrologue, setShowPrologue] = useState(false);
+  const [showEpilogue, setShowEpilogue] = useState(false);
 
   const t = UI[language];
   const currentLevelData = levels[stats.currentLevel];
   const currentLevelText = getLevelText(currentLevelData, language);
+  const prologueText = getPrologueText(PROLOGUE_LEVEL, language);
+  const epilogueText = getEpilogueText(EPILOGUE_FIGHT, language);
 
   const handleLanguageChange = (lang: Lang) => {
     setLanguage(lang);
@@ -95,20 +105,25 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [stats.gameState]);
 
-  // Advance level
+  // Advance level — after the final level, flow into the Epilogue fight
   const handleNextLevel = () => {
-    setStats((prev) => {
-      const nextIndex = (prev.currentLevel + 1) % levels.length;
-      return {
-        ...prev,
-        currentLevel: nextIndex,
-        gameState: 'playing'
-      };
-    });
+    if (stats.currentLevel === levels.length - 1) {
+      setShowEpilogue(true);
+      setShowPrologue(false);
+      setStats((prev) => ({ ...prev, gameState: 'playing' }));
+      return;
+    }
+    setStats((prev) => ({
+      ...prev,
+      currentLevel: prev.currentLevel + 1,
+      gameState: 'playing'
+    }));
   };
 
   // Skip or change level directly
   const handleSelectLevel = (idx: number) => {
+    setShowPrologue(false);
+    setShowEpilogue(false);
     setStats((prev) => ({
       ...prev,
       currentLevel: idx,
@@ -162,7 +177,35 @@ export default function App() {
       currentLevel: 0,
       gameState: 'playing'
     });
+    setShowPrologue(true);
+    setShowEpilogue(false);
     setMenuOpen(false);
+  };
+
+  // Jump straight to the prologue from the level selector
+  const handleSelectPrologue = () => {
+    setShowPrologue(true);
+    setShowEpilogue(false);
+    setStats((prev) => ({ ...prev, gameState: 'playing' }));
+  };
+
+  // Prologue's escape sequence finished — drop into the main level list
+  const handlePrologueComplete = () => {
+    setShowPrologue(false);
+  };
+
+  // Jump straight to the Epilogue fight from the level selector
+  const handleSelectEpilogue = () => {
+    setShowEpilogue(true);
+    setShowPrologue(false);
+    setStats((prev) => ({ ...prev, gameState: 'playing' }));
+  };
+
+  // Epilogue won — story complete, return to the main menu
+  const handleEpilogueComplete = () => {
+    setShowEpilogue(false);
+    setMenuOpen(false);
+    setStats((prev) => ({ ...prev, gameState: 'start_screen' }));
   };
 
   // Persist current run to localStorage
@@ -333,8 +376,30 @@ export default function App() {
                 </h2>
 
                 <div className="space-y-3 pt-1">
+                  <button
+                    onClick={handleSelectPrologue}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition-all block cursor-pointer ${
+                      showPrologue
+                      ? 'bg-[#2a1408]/70 border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.3)] transform scale-[1.02]'
+                      : 'bg-[#0d071f]/50 hover:bg-[#200d3d]/40 border-transparent text-gray-300'
+                    }`}
+                    id="btn-select-prologue"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono tracking-widest text-orange-400 font-bold">{t.stage} 00</span>
+                      {showPrologue && <span className="w-2 h-2 rounded-full bg-orange-400 animate-ping" />}
+                    </div>
+                    <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
+                      <Skull className="w-3.5 h-3.5 text-orange-300" />
+                      {prologueText.name}
+                    </h3>
+                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-tight">
+                      {prologueText.description}
+                    </p>
+                  </button>
+
                   {levels.map((lvl, index) => {
-                    const isActive = stats.currentLevel === index;
+                    const isActive = !showPrologue && !showEpilogue && stats.currentLevel === index;
                     const lvlText = getLevelText(lvl, language);
                     return (
                       <button
@@ -362,6 +427,28 @@ export default function App() {
                       </button>
                     );
                   })}
+
+                  <button
+                    onClick={handleSelectEpilogue}
+                    className={`w-full text-left p-3 rounded-xl border-2 transition-all block cursor-pointer ${
+                      showEpilogue
+                      ? 'bg-[#2a0d0d]/70 border-rose-500/80 shadow-[0_0_15px_rgba(244,63,94,0.3)] transform scale-[1.02]'
+                      : 'bg-[#0d071f]/50 hover:bg-[#200d3d]/40 border-transparent text-gray-300'
+                    }`}
+                    id="btn-select-epilogue"
+                  >
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-mono tracking-widest text-rose-400 font-bold">{t.stage} 11</span>
+                      {showEpilogue && <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />}
+                    </div>
+                    <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
+                      <Swords className="w-3.5 h-3.5 text-rose-300" />
+                      {epilogueText.name}
+                    </h3>
+                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-tight">
+                      {epilogueText.description}
+                    </p>
+                  </button>
                 </div>
               </div>
 
@@ -391,39 +478,89 @@ export default function App() {
             {/* Central Canvas Zone */}
             <main className="lg:col-span-9 flex flex-col gap-6" id="main-column">
 
-              {/* Responsive Active Level Alert Info Banner */}
-              <div className="bg-gradient-to-r from-[#17082e]/45 to-[#240c42]/30 px-5 py-4 rounded-2xl border-2 border-fuchsia-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="level-alert-banner">
-                <div className="absolute right-0 top-0 text-[100px] text-fuchsia-950/20 font-sans font-black pointer-events-none select-none leading-none">
-                  {String(currentLevelData.id).padStart(2, '0')}
-                </div>
-                <Info className="w-5 h-5 text-fuchsia-450 shrink-0 mt-0.5" />
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <h2 className="text-sm font-bold text-white leading-none">
-                      {t.activeMission}: {currentLevelText.name}
-                    </h2>
-                    <span className="text-[10px] bg-fuchsia-950/50 text-fuchsia-300 font-mono px-1.5 py-0.5 rounded border border-fuchsia-500/30 font-extrabold">
-                      {t.safetyAt} {currentLevelData.endX}m
-                    </span>
+              {showEpilogue ? (
+                <div className="bg-gradient-to-r from-[#2a0d0d]/55 to-[#1a0808]/40 px-5 py-4 rounded-2xl border-2 border-rose-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="epilogue-alert-banner">
+                  <div className="absolute right-0 top-0 text-[100px] text-rose-950/25 font-sans font-black pointer-events-none select-none leading-none">
+                    11
                   </div>
-                  <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
-                    {currentLevelText.description} {t.bannerSuffix}
-                  </p>
+                  <Swords className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-bold text-white leading-none">
+                      {t.activeMission}: {epilogueText.name}
+                    </h2>
+                    <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
+                      {epilogueText.description}
+                    </p>
+                  </div>
                 </div>
-              </div>
+              ) : showPrologue ? (
+                <div className="bg-gradient-to-r from-[#2a1408]/55 to-[#1a0a08]/40 px-5 py-4 rounded-2xl border-2 border-orange-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="prologue-alert-banner">
+                  <div className="absolute right-0 top-0 text-[100px] text-orange-950/25 font-sans font-black pointer-events-none select-none leading-none">
+                    00
+                  </div>
+                  <Skull className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <h2 className="text-sm font-bold text-white leading-none">
+                      {t.activeMission}: {prologueText.name}
+                    </h2>
+                    <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
+                      {prologueText.description}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                /* Responsive Active Level Alert Info Banner */
+                <div className="bg-gradient-to-r from-[#17082e]/45 to-[#240c42]/30 px-5 py-4 rounded-2xl border-2 border-fuchsia-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="level-alert-banner">
+                  <div className="absolute right-0 top-0 text-[100px] text-fuchsia-950/20 font-sans font-black pointer-events-none select-none leading-none">
+                    {String(currentLevelData.id).padStart(2, '0')}
+                  </div>
+                  <Info className="w-5 h-5 text-fuchsia-450 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-sm font-bold text-white leading-none">
+                        {t.activeMission}: {currentLevelText.name}
+                      </h2>
+                      <span className="text-[10px] bg-fuchsia-950/50 text-fuchsia-300 font-mono px-1.5 py-0.5 rounded border border-fuchsia-500/30 font-extrabold">
+                        {t.safetyAt} {currentLevelData.endX}m
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
+                      {currentLevelText.description} {t.bannerSuffix}
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Game Viewport screen component */}
-              <GameCanvas
-                level={currentLevelData}
-                settings={settings}
-                stats={stats}
-                onStatsChange={setStats}
-                onNextLevel={handleNextLevel}
-                onRestartLevel={handleRestartLevel}
-                paused={isPausedByMenu}
-                onTogglePause={() => setMenuOpen((prev) => !prev)}
-                language={language}
-              />
+              {showEpilogue ? (
+                <FighterCanvas
+                  fight={EPILOGUE_FIGHT}
+                  language={language}
+                  onComplete={handleEpilogueComplete}
+                  paused={isPausedByMenu}
+                  onTogglePause={() => setMenuOpen((prev) => !prev)}
+                />
+              ) : showPrologue ? (
+                <PrologueCanvas
+                  prologue={PROLOGUE_LEVEL}
+                  language={language}
+                  onComplete={handlePrologueComplete}
+                  paused={isPausedByMenu}
+                  onTogglePause={() => setMenuOpen((prev) => !prev)}
+                />
+              ) : (
+                <GameCanvas
+                  level={currentLevelData}
+                  settings={settings}
+                  stats={stats}
+                  onStatsChange={setStats}
+                  onNextLevel={handleNextLevel}
+                  onRestartLevel={handleRestartLevel}
+                  paused={isPausedByMenu}
+                  onTogglePause={() => setMenuOpen((prev) => !prev)}
+                  language={language}
+                />
+              )}
 
             </main>
 
