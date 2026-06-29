@@ -8,6 +8,9 @@ import { PrologueLevel, StepPlatform, HidingSpot } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, RotateCcw, Play } from 'lucide-react';
 import { Lang, UI } from '../i18n';
+import { preloadAssets, getImage, tileParallax } from '../assets';
+
+preloadAssets();
 
 const CRAWL_SPEED = 2.3;
 const CLIMB_SPEED = 3; // px/frame the toddler (and tiger) ease toward the ground height
@@ -19,6 +22,9 @@ const PLAYER_H = 18;
 const APPROACH_SPEED = 3.2;
 const LEAVE_SPEED = 2.6;
 const HUNT_START_DELAY_MS = 2200; // Mowgli gets a brief head start before the tiger begins hunting
+// The game is authored in a 420-tall world space; the canvas backing store is
+// taller (720p) and the whole scene is rendered scaled up to fill it.
+const BASE_H = 420;
 
 const getGroundYAt = (platforms: StepPlatform[], x: number): number => {
   for (const p of platforms) {
@@ -148,11 +154,14 @@ export default function PrologueCanvas({
 
     const resizeCanvas = () => {
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = 420;
+      // 16:9 window — back the canvas with its actual displayed size.
+      canvas.width = Math.round(rect.width) || 1280;
+      canvas.height = Math.round(rect.height) || 720;
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    const resizeObserver = new ResizeObserver(() => resizeCanvas());
+    resizeObserver.observe(canvas);
 
     let lastStamp = performance.now();
     let wasUpPressed = false;
@@ -165,6 +174,12 @@ export default function PrologueCanvas({
       const dt = timestamp - lastStamp;
       lastStamp = timestamp;
 
+      // Scale the 420-tall world up to the canvas's pixel height; `view`
+      // reports the world-space viewport so all draw/camera math is unchanged.
+      const renderScale = canvas.height / BASE_H;
+      const view = { width: canvas.width / renderScale, height: BASE_H };
+      ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+
       if (s.deathTimer > 0) {
         s.deathTimer += dt;
         if (s.deathTimer > 900) {
@@ -175,7 +190,7 @@ export default function PrologueCanvas({
           s.player.hidingSpotId = null;
           setCaught(false);
         }
-        drawScene(ctx, canvas, s);
+        drawScene(ctx, view, s);
         s.frameId = requestAnimationFrame(loop);
         return;
       }
@@ -293,16 +308,16 @@ export default function PrologueCanvas({
       }
 
       // Camera
-      const optimalCamX = p.x - canvas.width / 2.5;
-      const maxScroll = Math.max(0, s.levelLength - canvas.width);
+      const optimalCamX = p.x - view.width / 2.5;
+      const maxScroll = Math.max(0, s.levelLength - view.width);
       s.cameraX = Math.max(0, Math.min(maxScroll, optimalCamX));
 
-      const optimalCamY = p.y - canvas.height / 2.2;
+      const optimalCamY = p.y - view.height / 2.2;
       const minScrollY = Math.min(0, s.worldMinY - 60);
-      const maxScrollY = Math.max(0, s.worldMaxY + 60 - canvas.height);
+      const maxScrollY = Math.max(0, s.worldMaxY + 60 - view.height);
       s.cameraY = Math.max(minScrollY, Math.min(maxScrollY, optimalCamY));
 
-      drawScene(ctx, canvas, s);
+      drawScene(ctx, view, s);
       s.frameId = requestAnimationFrame(loop);
     };
 
@@ -313,6 +328,7 @@ export default function PrologueCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', resizeCanvas);
+      resizeObserver.disconnect();
     };
   }, [prologue, paused, escaped]);
 
@@ -358,25 +374,42 @@ export default function PrologueCanvas({
     }
   };
 
-  const drawScene = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, s: typeof stateRef.current) => {
+  const drawScene = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, s: typeof stateRef.current) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Smoky fire-lit sky to suggest the village under attack
-    const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    sky.addColorStop(0, '#1a0a08');
-    sky.addColorStop(0.45, '#3a120f');
-    sky.addColorStop(1, '#142013');
-    ctx.fillStyle = sky;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Layered atmospheric backdrop (painted assets with procedural fallback)
+    const skyImg = getImage('bgPrologueSky');
+    const farImg = getImage('bgPrologueFar');
+    const nearImg = getImage('bgPrologueNear');
 
-    // Distant glow (burning village) parallax
-    for (let i = 0; i < 4; i++) {
-      const gx = (i * 420 - s.cameraX * 0.15) % (canvas.width + 300);
-      const glow = ctx.createRadialGradient(gx, canvas.height - 60, 5, gx, canvas.height - 60, 90);
-      glow.addColorStop(0, 'rgba(249, 115, 22, 0.35)');
-      glow.addColorStop(1, 'rgba(249, 115, 22, 0)');
-      ctx.fillStyle = glow;
-      ctx.fillRect(gx - 90, canvas.height - 150, 180, 150);
+    if (skyImg) {
+      ctx.drawImage(skyImg, 0, 0, canvas.width, canvas.height);
+    } else {
+      const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+      sky.addColorStop(0, '#1a0a08');
+      sky.addColorStop(0.45, '#3a120f');
+      sky.addColorStop(1, '#142013');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    if (farImg) {
+      // Burning village / tree-line on the horizon (scroll speed 0.15)
+      tileParallax(ctx, farImg, canvas.width, canvas.width, canvas.height, 0, s.cameraX * 0.15);
+    } else {
+      for (let i = 0; i < 4; i++) {
+        const gx = (i * 420 - s.cameraX * 0.15) % (canvas.width + 300);
+        const glow = ctx.createRadialGradient(gx, canvas.height - 60, 5, gx, canvas.height - 60, 90);
+        glow.addColorStop(0, 'rgba(249, 115, 22, 0.35)');
+        glow.addColorStop(1, 'rgba(249, 115, 22, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(gx - 90, canvas.height - 150, 180, 150);
+      }
+    }
+
+    if (nearImg) {
+      // Dark hanging foliage frame (scroll speed 0.32)
+      tileParallax(ctx, nearImg, canvas.width, canvas.width, canvas.height, 0, s.cameraX * 0.32);
     }
 
     ctx.save();
@@ -614,7 +647,7 @@ export default function PrologueCanvas({
   };
 
   return (
-    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden" id="prologue-box">
+    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden w-full max-w-[1312px] mx-auto" id="prologue-box">
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-orange-400" />
@@ -632,10 +665,10 @@ export default function PrologueCanvas({
         </div>
       </div>
 
-      <div className="w-full relative bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-[1280px] aspect-[16/9] mx-auto bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
         <canvas
           ref={canvasRef}
-          className="w-full block h-[420px] bg-slate-900 cursor-crosshair"
+          className="w-full h-full block bg-slate-900 cursor-crosshair"
           id="prologue-canvas"
         />
 

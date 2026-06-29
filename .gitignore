@@ -6,3 +6,5 @@ coverage/
 *.log
 .env*
 !.env.example
+# Built by tools/build-editor-exe.ps1 (npm run build:editor-exe) from tools/EditorLauncher.cs
+editor.exe

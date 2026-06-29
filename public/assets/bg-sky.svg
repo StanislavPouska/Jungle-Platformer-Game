@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090d1c"/>
+      <stop offset="0.30" stop-color="#171436"/>
+      <stop offset="0.54" stop-color="#2b1f48"/>
+      <stop offset="0.76" stop-color="#1b4845"/>
+      <stop offset="1" stop-color="#1e7060"/>
+    </linearGradient>
+    <radialGradient id="moonGlow" cx="0.8" cy="0.18" r="0.55">
+      <stop offset="0" stop-color="#cdf2e7" stop-opacity="0.55"/>
+      <stop offset="0.28" stop-color="#82cabb" stop-opacity="0.22"/>
+      <stop offset="1" stop-color="#82cabb" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ray" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#d3f0e6" stop-opacity="0.15"/>
+      <stop offset="1" stop-color="#d3f0e6" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="haze" x="0" y="0" width="100%" height="100%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.006 0.013" numOctaves="4" seed="11" stitchTiles="stitch" result="n"/>
+      <feColorMatrix in="n" type="matrix"
+        values="0 0 0 0 0.62  0 0 0 0 0.80  0 0 0 0 0.73  0 0 0 0.5 -0.27"/>
+    </filter>
+  </defs>
+
+  <rect width="1280" height="720" fill="url(#sky)"/>
+  <rect width="1280" height="520" filter="url(#haze)" opacity="0.5"/>
+  <rect width="1280" height="720" fill="url(#moonGlow)"/>
+
+  <g transform="rotate(16 1024 132)" opacity="0.85">
+    <polygon points="1000,92 1012,92 760,720 688,720" fill="url(#ray)"/>
+    <polygon points="1036,96 1052,96 992,720 906,720" fill="url(#ray)"/>
+    <polygon points="1072,100 1084,100 1184,720 1112,720" fill="url(#ray)"/>
+  </g>
+
+  <circle cx="1024" cy="132" r="44" fill="#e3f7ee" opacity="0.9"/>
+  <circle cx="1024" cy="132" r="120" fill="url(#moonGlow)"/>
+</svg>

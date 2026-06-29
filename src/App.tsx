@@ -10,6 +10,8 @@ import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
 import PrologueCanvas from './components/PrologueCanvas';
 import FighterCanvas from './components/FighterCanvas';
+import LevelEditor from './components/LevelEditor';
+import ChapterCard, { ChapterId } from './components/ChapterCard';
 import { PROLOGUE_LEVEL } from './prologueData';
 import { EPILOGUE_FIGHT } from './fighterData';
 import {
@@ -24,38 +26,24 @@ import {
   Info,
   Menu as MenuIcon,
   Skull,
-  Swords
+  Swords,
+  SquarePen
 } from 'lucide-react';
 import { audioSynth } from './audio';
 import { Lang, UI, getLevelText, getPrologueText, getEpilogueText } from './i18n';
+import { SAVE_KEY, LANG_KEY, SaveData, readSaveData, readSavedLang } from './storage';
 
-const SAVE_KEY = 'jungle-platformer-save-v1';
-const LANG_KEY = 'jungle-platformer-lang';
+// A navigable stage and the chapter it belongs to. Levels 1-4 (indices 0-3)
+// are Chapter 1; levels 5-10 (indices 4-9) are Chapter 2.
+type StageRef =
+  | { kind: 'prologue' }
+  | { kind: 'level'; index: number }
+  | { kind: 'epilogue' };
 
-function readSavedLang(): Lang {
-  try {
-    const raw = localStorage.getItem(LANG_KEY);
-    return raw === 'cs' ? 'cs' : 'en';
-  } catch {
-    return 'en';
-  }
-}
-
-interface SaveData {
-  stats: GameStats;
-  settings: GameSettings;
-  levels: Level[];
-  savedAt: string;
-}
-
-function readSaveData(): SaveData | null {
-  try {
-    const raw = localStorage.getItem(SAVE_KEY);
-    if (!raw) return null;
-    return JSON.parse(raw) as SaveData;
-  } catch {
-    return null;
-  }
+function chapterOf(stage: StageRef): ChapterId {
+  if (stage.kind === 'prologue') return 'prologue';
+  if (stage.kind === 'epilogue') return 'epilogue';
+  return stage.index <= 3 ? 'ch1' : 'ch2';
 }
 
 export default function App() {
@@ -71,16 +59,22 @@ export default function App() {
     gameState: 'start_screen'
   });
 
-  const [activeTab, setActiveTab] = useState<'game' | 'help'>('game');
+  const [activeTab, setActiveTab] = useState<'game' | 'help' | 'editor'>('game');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveData, setSaveData] = useState<SaveData | null>(() => readSaveData());
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
   const [showPrologue, setShowPrologue] = useState(false);
   const [showEpilogue, setShowEpilogue] = useState(false);
+  // Chapter title cards: which chapter the player is currently in, plus a
+  // pending card to show (with the stage to launch once the player begins).
+  const [activeChapter, setActiveChapter] = useState<ChapterId | null>(null);
+  const [chapterCard, setChapterCard] = useState<ChapterId | null>(null);
+  const [pendingStage, setPendingStage] = useState<StageRef | null>(null);
 
   const t = UI[language];
-  const currentLevelData = levels[stats.currentLevel];
+  // Clamp in case the editor deleted the level the game was sitting on.
+  const currentLevelData = levels[Math.min(stats.currentLevel, levels.length - 1)];
   const currentLevelText = getLevelText(currentLevelData, language);
   const prologueText = getPrologueText(PROLOGUE_LEVEL, language);
   const epilogueText = getEpilogueText(EPILOGUE_FIGHT, language);
@@ -105,30 +99,84 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [stats.gameState]);
 
-  // Advance level — after the final level, flow into the Epilogue fight
-  const handleNextLevel = () => {
-    if (stats.currentLevel === levels.length - 1) {
+  // Standalone editor "Playtest" navigates here with ?play=N — load the levels
+  // the editor saved and jump straight into level N, then strip the param.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const playRaw = params.get('play');
+    if (playRaw === null) return;
+    const saved = readSaveData();
+    const sourceLevels = saved?.levels?.length ? saved.levels : INITIAL_LEVELS;
+    if (saved?.levels?.length) setLevels(saved.levels);
+    const idx = parseInt(playRaw, 10);
+    const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.min(idx, sourceLevels.length - 1)) : 0;
+    setShowPrologue(false);
+    setShowEpilogue(false);
+    setChapterCard(null);
+    setPendingStage(null);
+    setActiveChapter(chapterOf({ kind: 'level', index: safeIdx }));
+    setActiveTab('game');
+    setStats((prev) => ({ ...prev, currentLevel: safeIdx, gameState: 'playing' }));
+    params.delete('play');
+    const qs = params.toString();
+    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, []);
+
+  // Launch a stage immediately (no chapter card).
+  const launchStage = (stage: StageRef) => {
+    setMenuOpen(false);
+    setChapterCard(null);
+    setPendingStage(null);
+    setActiveChapter(chapterOf(stage));
+    if (stage.kind === 'prologue') {
+      setShowPrologue(true);
+      setShowEpilogue(false);
+      setStats((prev) => ({ ...prev, gameState: 'playing' }));
+    } else if (stage.kind === 'epilogue') {
       setShowEpilogue(true);
       setShowPrologue(false);
       setStats((prev) => ({ ...prev, gameState: 'playing' }));
-      return;
+    } else {
+      setShowPrologue(false);
+      setShowEpilogue(false);
+      setStats((prev) => ({ ...prev, currentLevel: stage.index, gameState: 'playing' }));
     }
-    setStats((prev) => ({
-      ...prev,
-      currentLevel: prev.currentLevel + 1,
-      gameState: 'playing'
-    }));
   };
 
-  // Skip or change level directly
+  // Navigate to a stage. Crossing into a new chapter first shows its title
+  // card; navigating within the current chapter launches the stage directly.
+  const requestStage = (stage: StageRef, forceCard = false) => {
+    if (forceCard || chapterOf(stage) !== activeChapter) {
+      setPendingStage(stage);
+      setChapterCard(chapterOf(stage));
+    } else {
+      launchStage(stage);
+    }
+  };
+
+  // Begin the pending chapter from its title card.
+  const handleBeginChapter = () => {
+    if (pendingStage) launchStage(pendingStage);
+  };
+
+  // Advance level — after the final level, flow into the Epilogue fight
+  const handleNextLevel = () => {
+    if (stats.currentLevel === levels.length - 1) {
+      requestStage({ kind: 'epilogue' });
+    } else {
+      requestStage({ kind: 'level', index: stats.currentLevel + 1 });
+    }
+  };
+
+  // Skip or change level directly from the sidebar
   const handleSelectLevel = (idx: number) => {
-    setShowPrologue(false);
-    setShowEpilogue(false);
-    setStats((prev) => ({
-      ...prev,
-      currentLevel: idx,
-      gameState: 'playing'
-    }));
+    requestStage({ kind: 'level', index: idx });
+  };
+
+  // Playtest a level from the in-app editor tab — jump straight into it.
+  const handlePlaytestLevel = (idx: number) => {
+    setActiveTab('game');
+    launchStage({ kind: 'level', index: idx });
   };
 
   // Reload current stage
@@ -163,10 +211,15 @@ export default function App() {
       gameState: prev.gameState === 'start_screen' ? 'start_screen' : 'playing'
     }));
     setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
+    setShowPrologue(false);
+    setShowEpilogue(false);
+    setChapterCard(null);
+    setPendingStage(null);
+    setActiveChapter('ch1');
     audioSynth.playJump();
   };
 
-  // Start a brand new run from the menu
+  // Start a brand new run from the menu — opens with the Prologue chapter card
   const handleNewGame = () => {
     setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
     setStats({
@@ -177,33 +230,35 @@ export default function App() {
       currentLevel: 0,
       gameState: 'playing'
     });
-    setShowPrologue(true);
+    setShowPrologue(false);
     setShowEpilogue(false);
+    setActiveChapter(null);
     setMenuOpen(false);
+    setPendingStage({ kind: 'prologue' });
+    setChapterCard('prologue');
   };
 
   // Jump straight to the prologue from the level selector
   const handleSelectPrologue = () => {
-    setShowPrologue(true);
-    setShowEpilogue(false);
-    setStats((prev) => ({ ...prev, gameState: 'playing' }));
+    requestStage({ kind: 'prologue' });
   };
 
-  // Prologue's escape sequence finished — drop into the main level list
+  // Prologue's escape sequence finished — advance into Chapter 1
   const handlePrologueComplete = () => {
-    setShowPrologue(false);
+    requestStage({ kind: 'level', index: 0 });
   };
 
   // Jump straight to the Epilogue fight from the level selector
   const handleSelectEpilogue = () => {
-    setShowEpilogue(true);
-    setShowPrologue(false);
-    setStats((prev) => ({ ...prev, gameState: 'playing' }));
+    requestStage({ kind: 'epilogue' });
   };
 
   // Epilogue won — story complete, return to the main menu
   const handleEpilogueComplete = () => {
     setShowEpilogue(false);
+    setChapterCard(null);
+    setPendingStage(null);
+    setActiveChapter(null);
     setMenuOpen(false);
     setStats((prev) => ({ ...prev, gameState: 'start_screen' }));
   };
@@ -220,7 +275,7 @@ export default function App() {
     setSaveData(data);
   };
 
-  // Restore a previously saved run
+  // Restore a previously saved run — resume directly, no chapter card
   const handleLoadGame = () => {
     const data = readSaveData();
     if (!data) return;
@@ -228,6 +283,11 @@ export default function App() {
     setSettings(data.settings);
     setStats({ ...data.stats, gameState: 'playing' });
     setSaveData(data);
+    setShowPrologue(false);
+    setShowEpilogue(false);
+    setChapterCard(null);
+    setPendingStage(null);
+    setActiveChapter(chapterOf({ kind: 'level', index: data.stats.currentLevel }));
     setMenuOpen(false);
   };
 
@@ -255,6 +315,15 @@ export default function App() {
           language={language}
           onLanguageChange={handleLanguageChange}
         />
+      </div>
+    );
+  }
+
+  // Chapter title card — shown between chapters before the stage loads
+  if (chapterCard) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 font-sans">
+        <ChapterCard chapterId={chapterCard} language={language} onBegin={handleBeginChapter} />
       </div>
     );
   }
@@ -287,8 +356,8 @@ export default function App() {
         />
       )}
 
-      {/* Main Container */}
-      <div className="w-full max-w-7xl mx-auto px-4 md:px-6 flex-1 flex flex-col gap-6 pt-5">
+      {/* Main Container (widened so the 16:9 720p game window has room) */}
+      <div className="w-full max-w-[1700px] mx-auto px-4 md:px-6 flex-1 flex flex-col gap-6 pt-5">
 
         {/* Navigation / Brand Header */}
         <header className="flex flex-col md:flex-row justify-between items-center bg-[#1d0735]/70 border-2 border-fuchsia-500/25 px-6 py-4 rounded-3xl backdrop-blur-md shadow-[0_0_25px_rgba(168,85,247,0.15)] gap-4" id="main-header">
@@ -358,17 +427,36 @@ export default function App() {
               >
                 {t.tabHelp}
               </button>
+              <button
+                onClick={() => setActiveTab('editor')}
+                className={`flex items-center gap-1 px-4 py-1.5 text-xs font-mono rounded-lg transition-all ${
+                  activeTab === 'editor'
+                  ? 'bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white font-bold shadow-[0_0_12px_rgba(236,72,153,0.35)]'
+                  : 'text-gray-400 hover:text-white'
+                } cursor-pointer`}
+                id="tab-editor"
+              >
+                <SquarePen className="w-3.5 h-3.5" />
+                {t.tabEditor}
+              </button>
             </nav>
           </div>
 
         </header>
 
         {/* Main Body */}
-        {activeTab === 'game' ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        {activeTab === 'editor' ? (
+          <LevelEditor
+            levels={levels}
+            onLevelsChange={setLevels}
+            onPlaytest={handlePlaytestLevel}
+            language={language}
+          />
+        ) : activeTab === 'game' ? (
+          <div className="flex flex-col xl:flex-row gap-6 items-start justify-center">
 
             {/* Left sidebar - Levels List Selector */}
-            <aside className="lg:col-span-3 space-y-4" id="lvl-selector-aside">
+            <aside className="w-full xl:w-[300px] xl:shrink-0 space-y-4" id="lvl-selector-aside">
               <div className="bg-[#180a2d]/80 rounded-2xl p-4 border-2 border-fuchsia-500/25 shadow-xl shadow-fuchsia-950/20 space-y-3">
                 <h2 className="text-xs font-mono font-bold tracking-wider uppercase text-fuchsia-400 flex items-center gap-1.5">
                   <MapPin className="w-4 h-4 text-fuchsia-400" />
@@ -476,7 +564,7 @@ export default function App() {
             </aside>
 
             {/* Central Canvas Zone */}
-            <main className="lg:col-span-9 flex flex-col gap-6" id="main-column">
+            <main className="w-full xl:flex-1 min-w-0 flex flex-col gap-6" id="main-column">
 
               {showEpilogue ? (
                 <div className="bg-gradient-to-r from-[#2a0d0d]/55 to-[#1a0808]/40 px-5 py-4 rounded-2xl border-2 border-rose-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="epilogue-alert-banner">

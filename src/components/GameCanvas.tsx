@@ -8,6 +8,13 @@ import { Player, Platform, Toad, Collectible, Particle, Level, GameSettings, Gam
 import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
 import { Lang, UI, getLevelText, getPuzzleText } from '../i18n';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+
+preloadAssets();
+
+// The game is authored in a 420-tall world space; the canvas backing store is
+// taller (720p) and the whole scene is rendered scaled up to fill it.
+const BASE_H = 420;
 
 // Scans a level's platforms/toads/collectibles to find the vertical extent
 // of playable content, so the camera knows how far it may safely scroll.
@@ -201,12 +208,18 @@ export default function GameCanvas({
       if (canvas) {
         // High DPI sharpness support
         const rect = canvas.getBoundingClientRect();
-        canvas.width = rect.width;
-        canvas.height = 420; // Fixed gaming box coordinate space
+        // 16:9 window — back the canvas with its actual displayed size so the
+        // world (BASE_H tall) scales to fill it with no distortion.
+        canvas.width = Math.round(rect.width) || 1280;
+        canvas.height = Math.round(rect.height) || 720;
       }
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    // The 16:9 box sizes itself via layout (not window resize), so observe the
+    // canvas directly to keep its backing store in sync with its displayed size.
+    const resizeObserver = new ResizeObserver(() => resizeCanvas());
+    resizeObserver.observe(canvas);
 
     // Frame runner
     let lastStamp = performance.now();
@@ -216,7 +229,7 @@ export default function GameCanvas({
       const s = stateRef.current;
       if (s.particles.length < 40 && Math.random() < 0.08) {
         s.particles.push({
-          x: s.cameraX + Math.random() * canvas.width + 100,
+          x: s.cameraX + Math.random() * (canvas.width * BASE_H / canvas.height) + 100,
           y: s.cameraY - 10,
           vx: -0.5 - Math.random() * 1.5,
           vy: 0.5 + Math.random() * 1.5,
@@ -230,17 +243,23 @@ export default function GameCanvas({
     };
 
     const loop = (timestamp: number) => {
+      // Scale the 420-tall world up to the canvas's pixel height; `view`
+      // reports the world-space viewport so all draw/camera math is unchanged.
+      const renderScale = canvas.height / BASE_H;
+      const view = { width: canvas.width / renderScale, height: BASE_H };
+      ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+
       if (paused) {
         // Render pause message
         ctx.fillStyle = 'rgba(15, 23, 42, 0.7)';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.fillRect(0, 0, view.width, view.height);
         ctx.font = 'bold 24px sans-serif';
         ctx.fillStyle = '#10b981';
         ctx.textAlign = 'center';
-        ctx.fillText(t.canvasGamePaused, canvas.width / 2, canvas.height / 2 - 10);
+        ctx.fillText(t.canvasGamePaused, view.width / 2, view.height / 2 - 10);
         ctx.font = '14px monospace';
         ctx.fillStyle = '#94a3b8';
-        ctx.fillText(t.canvasPausedHint, canvas.width / 2, canvas.height / 2 + 25);
+        ctx.fillText(t.canvasPausedHint, view.width / 2, view.height / 2 + 25);
         return;
       }
 
@@ -271,7 +290,7 @@ export default function GameCanvas({
       }
 
       if (s.timeExpired) {
-        drawGame(ctx, canvas, s);
+        drawGame(ctx, view, s);
         s.frameId = requestAnimationFrame(loop);
         return;
       }
@@ -296,7 +315,7 @@ export default function GameCanvas({
       }
 
       // PAINT / RENDER CYCLE
-      drawGame(ctx, canvas, s);
+      drawGame(ctx, view, s);
 
       s.frameId = requestAnimationFrame(loop);
     };
@@ -308,6 +327,7 @@ export default function GameCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', resizeCanvas);
+      resizeObserver.disconnect();
     };
   }, [level, paused, settings, showPuzzle, language]);
 
@@ -686,7 +706,7 @@ export default function GameCanvas({
   };
 
   // Precise vector geometries representation for Retro aesthetics
-  const drawGame = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, s: any) => {
+  const drawGame = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, s: any) => {
     const p: Player = s.player;
 
     // 1. Calculate camera position centering player
@@ -705,34 +725,57 @@ export default function GameCanvas({
     // Clear background
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // 2. Parallax Backdrop 
-    // Sunset orange Sky
-    const gradientSky = ctx.createLinearGradient(0, 0, 0, canvas.height);
-    gradientSky.addColorStop(0, '#101726'); // dark night twilight
-    gradientSky.addColorStop(0.5, '#1e1b4b'); // deep purple
-    gradientSky.addColorStop(1, '#115e59'); // warm jungle mist
-    ctx.fillStyle = gradientSky;
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // 2. Parallax Backdrop — per-level: custom uploaded image first, then the
+    // chosen preset's layered assets, then a procedural fallback.
+    const customBg = level.backgroundImage ? getImageFromDataUrl(level.backgroundImage) : null;
+    const preset = LEVEL_BACKGROUNDS[level.background ?? 'jungle'] ?? LEVEL_BACKGROUNDS.jungle;
+    const skyImg = getImage(preset.sky);
+    const farImg = getImage(preset.far);
+    const nearImg = getImage(preset.near);
 
-    // Draw Parallax Far Mountains/Sillhouettes (scroll speed: 0.1)
-    ctx.fillStyle = '#064e3b';
-    ctx.globalAlpha = 0.2;
-    for (let i = 0; i < 6; i++) {
-      const xPos = (i * 350 - (s.cameraX * 0.12)) % (canvas.width + 400);
-      drawJungleCanopyHill(ctx, xPos, canvas.height - 80, 240, 110);
-    }
+    if (customBg) {
+      // Custom backdrop fills the whole view (no parallax layers).
+      ctx.drawImage(customBg, 0, 0, canvas.width, canvas.height);
+    } else {
+      if (skyImg) {
+        ctx.drawImage(skyImg, 0, 0, canvas.width, canvas.height);
+      } else {
+        // Fallback: gradient sky
+        const gradientSky = ctx.createLinearGradient(0, 0, 0, canvas.height);
+        gradientSky.addColorStop(0, '#101726');
+        gradientSky.addColorStop(0.5, '#1e1b4b');
+        gradientSky.addColorStop(1, '#115e59');
+        ctx.fillStyle = gradientSky;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
 
-    // Midground Jungle Ruins & Giant Stems (scroll speed: 0.45)
-    ctx.fillStyle = '#0f2922';
-    ctx.globalAlpha = 0.4;
-    for (let i = 0; i < 5; i++) {
-      const xPos = (i * 500 - (s.cameraX * 0.35)) % (canvas.width + 500);
-      // Trunk pillar
-      ctx.fillRect(xPos + 50, 0, 60, canvas.height);
-      // Leaves branch
-      drawJungleCanopyHill(ctx, xPos + 80, 120, 190, 80);
+      if (farImg) {
+        // Distant canopy tree-line (scroll speed 0.12)
+        tileParallax(ctx, farImg, canvas.width, canvas.width, canvas.height, 0, s.cameraX * 0.12);
+      } else {
+        ctx.fillStyle = '#064e3b';
+        ctx.globalAlpha = 0.2;
+        for (let i = 0; i < 6; i++) {
+          const xPos = (i * 350 - (s.cameraX * 0.12)) % (canvas.width + 400);
+          drawJungleCanopyHill(ctx, xPos, canvas.height - 80, 240, 110);
+        }
+        ctx.globalAlpha = 1.0;
+      }
+
+      if (nearImg) {
+        // Nearer hanging foliage frame (scroll speed 0.3)
+        tileParallax(ctx, nearImg, canvas.width, canvas.width, canvas.height, 0, s.cameraX * 0.3);
+      } else {
+        ctx.fillStyle = '#0f2922';
+        ctx.globalAlpha = 0.4;
+        for (let i = 0; i < 5; i++) {
+          const xPos = (i * 500 - (s.cameraX * 0.35)) % (canvas.width + 500);
+          ctx.fillRect(xPos + 50, 0, 60, canvas.height);
+          drawJungleCanopyHill(ctx, xPos + 80, 120, 190, 80);
+        }
+        ctx.globalAlpha = 1.0;
+      }
     }
-    ctx.globalAlpha = 1.0;
 
     // Draw Swamp / Mud Base under the stage
     ctx.fillStyle = 'rgba(6, 78, 59, 0.9)';
@@ -752,37 +795,63 @@ export default function GameCanvas({
     ctx.save();
     ctx.translate(-s.cameraX, -s.cameraY);
 
+    // Screen extents in world coordinates, used to ground platforms against
+    // the lower edge of the screen and to widen the end-of-level floor.
+    const screenLeftW = s.cameraX;
+    const screenRightW = s.cameraX + canvas.width;
+    const screenBottomW = s.cameraY + canvas.height;
+    const atLevelEnd = s.cameraX >= s.levelLength - canvas.width - 2;
+
     // 3. Draw Platforms
     s.platforms.forEach((plat: Platform) => {
+      // Level 1: the platform at the very end of the level extends to both the
+      // left and right edges of the screen once the camera reaches the end.
+      const isEndPlatform = level.id === 1 && plat.x + plat.width >= level.endX - 40;
+      const dx = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
+      const dw = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
+
+      // Solid ground (logs & bricks) extends straight down to the lower edge of
+      // the screen so the bottom platforms look grounded, not floating.
+      if (!plat.moving && (plat.type === 'moss_log' || plat.type === 'jungle_brick')) {
+        const colTop = plat.y + 6;
+        if (screenBottomW > colTop) {
+          const earth = ctx.createLinearGradient(0, colTop, 0, screenBottomW);
+          earth.addColorStop(0, '#412a16');
+          earth.addColorStop(1, '#241509');
+          ctx.fillStyle = earth;
+          ctx.fillRect(dx, colTop, dw, screenBottomW - colTop);
+        }
+      }
+
       // Platform moss pattern textures
       if (plat.type === 'moss_log') {
         // Brown Wood core
         ctx.fillStyle = '#78350f';
         ctx.beginPath();
-        ctx.roundRect(plat.x, plat.y, plat.width, plat.height, 6);
+        ctx.roundRect(dx, plat.y, dw, plat.height, 6);
         ctx.fill();
 
         // Lush Green moss cap
         ctx.fillStyle = '#15803d';
         ctx.beginPath();
-        ctx.roundRect(plat.x, plat.y, plat.width, 10, [6, 6, 0, 0]);
+        ctx.roundRect(dx, plat.y, dw, 10, [6, 6, 0, 0]);
         ctx.fill();
 
         // Wood texture details
         ctx.strokeStyle = '#451a03';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(plat.x + 15, plat.y + 22);
-        ctx.lineTo(plat.x + plat.width - 20, plat.y + 22);
-        ctx.moveTo(plat.x + 30, plat.y + 30);
-        ctx.lineTo(plat.x + plat.width - 50, plat.y + 30);
+        ctx.moveTo(dx + 15, plat.y + 22);
+        ctx.lineTo(dx + dw - 20, plat.y + 22);
+        ctx.moveTo(dx + 30, plat.y + 30);
+        ctx.lineTo(dx + dw - 50, plat.y + 30);
         ctx.stroke();
 
       } else if (plat.type === 'canopy_leaves') {
         // Soft green leave bundle path
         ctx.fillStyle = '#16a34a';
         ctx.beginPath();
-        ctx.roundRect(plat.x, plat.y, plat.width, plat.height, 12);
+        ctx.roundRect(dx, plat.y, dw, plat.height, 12);
         ctx.fill();
 
         // Leaf outline arcs
@@ -793,7 +862,7 @@ export default function GameCanvas({
         ctx.fillStyle = '#22c55e';
         // Add highlighted concentric leaf design
         ctx.beginPath();
-        ctx.ellipse(plat.x + plat.width / 2, plat.y + plat.height / 2, plat.width / 2.3, plat.height / 3, 0, 0, Math.PI * 2);
+        ctx.ellipse(dx + dw / 2, plat.y + plat.height / 2, dw / 2.3, plat.height / 3, 0, 0, Math.PI * 2);
         ctx.fill();
 
       } else if (plat.type === 'vine_bridge') {
@@ -801,17 +870,17 @@ export default function GameCanvas({
         ctx.strokeStyle = '#b45309';
         ctx.lineWidth = 4;
         ctx.beginPath();
-        ctx.moveTo(plat.x, plat.y + 12);
-        ctx.quadraticCurveTo(plat.x + plat.width/2, plat.y + 25, plat.x + plat.width, plat.y + 12);
+        ctx.moveTo(dx, plat.y + 12);
+        ctx.quadraticCurveTo(dx + dw/2, plat.y + 25, dx + dw, plat.y + 12);
         ctx.stroke();
 
         // Planks
         ctx.fillStyle = '#653110';
         const plankW = 14;
         const spacing = 22;
-        const count = Math.floor(plat.width / spacing);
+        const count = Math.floor(dw / spacing);
         for (let i = 0; i < count; i++) {
-          const px = plat.x + i * spacing + 4;
+          const px = dx + i * spacing + 4;
           // compute drop on parabola
           const t = i / count;
           const py = plat.y + 12 + 13 * (4 * t * (1 - t));
@@ -820,24 +889,24 @@ export default function GameCanvas({
       } else {
         // Ancient shrine/brick block
         ctx.fillStyle = '#475569';
-        ctx.fillRect(plat.x, plat.y, plat.width, plat.height);
+        ctx.fillRect(dx, plat.y, dw, plat.height);
 
         // Brick seams
         ctx.strokeStyle = '#1e293b';
         ctx.lineWidth = 2;
-        ctx.strokeRect(plat.x, plat.y, plat.width, plat.height);
-        
+        ctx.strokeRect(dx, plat.y, dw, plat.height);
+
         ctx.beginPath();
-        for (let bx = 30; bx < plat.width; bx += 30) {
-          ctx.moveTo(plat.x + bx, plat.y);
-          ctx.lineTo(plat.x + bx, plat.y + plat.height);
+        for (let bx = 30; bx < dw; bx += 30) {
+          ctx.moveTo(dx + bx, plat.y);
+          ctx.lineTo(dx + bx, plat.y + plat.height);
         }
         ctx.stroke();
 
         // Green moss creepers
         ctx.fillStyle = '#22c55e';
-        ctx.fillRect(plat.x + 5, plat.y, 15, 6);
-        ctx.fillRect(plat.x + plat.width - 25, plat.y, 20, 4);
+        ctx.fillRect(dx + 5, plat.y, 15, 6);
+        ctx.fillRect(dx + dw - 25, plat.y, 20, 4);
       }
     });
 
@@ -1149,56 +1218,86 @@ export default function GameCanvas({
     ctx.lineTo(-10 + armOffset, -8);
     ctx.stroke();
 
-    // E. Sunkissed Head & Messy Wild Jungle Hair
+    // E. Head — a human boy's head (3/4 view, facing right)
     const headY = -25 - headBob;
-    
-    // Face skull
-    ctx.fillStyle = '#c2410c';
+    const skin = '#c2410c';
+    const skinShade = '#9e3415';
+    const hair = '#1c140d';
+
+    // Skin head (slightly oval with a jaw)
+    ctx.fillStyle = skin;
     ctx.beginPath();
-    ctx.arc(0, headY, 7.5, 0, Math.PI * 2);
+    ctx.ellipse(0.5, headY, 7.4, 8.4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    // Jaw / cheek shading
+    ctx.fillStyle = skinShade;
+    ctx.beginPath();
+    ctx.ellipse(-0.5, headY + 4.2, 5, 3.6, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Wild Black hair (Mowgli's signature messy wild look)
-    ctx.fillStyle = '#0f172a'; // Off black wild hair
-    
-    // Hair cap
+    // Ear on the back (left) side
+    ctx.fillStyle = skin;
     ctx.beginPath();
-    ctx.arc(0, headY - 1, 8.5, Math.PI, 0); // Upper cap
+    ctx.ellipse(-6.6, headY + 1.4, 2, 2.6, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = skinShade;
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(-6.6, headY + 1.4, 1, -1.2, 1.8);
+    ctx.stroke();
+
+    // Hair — covers crown and back with a soft forehead fringe (not spiky)
+    ctx.fillStyle = hair;
+    ctx.beginPath();
+    ctx.moveTo(6.6, headY - 1.2);                              // forehead hairline (right)
+    ctx.quadraticCurveTo(8.2, headY - 6.5, 1.5, headY - 8.8);  // up to the crown
+    ctx.quadraticCurveTo(-6.5, headY - 10, -8.4, headY - 1.5); // over to the back-top-left
+    ctx.quadraticCurveTo(-9.4, headY + 4.5, -4.5, headY + 5);  // down the back to the nape
+    ctx.quadraticCurveTo(-7.4, headY + 0.5, -5, headY - 3.5);  // inner hairline rising
+    ctx.quadraticCurveTo(-1, headY - 5.8, 2.5, headY - 5);     // across the forehead
+    ctx.quadraticCurveTo(5.8, headY - 4.4, 6.6, headY - 1.2);  // fringe back to start
+    ctx.closePath();
     ctx.fill();
 
-    // Wild spiky hair strands around skull
+    // Eyebrow
+    ctx.strokeStyle = hair;
+    ctx.lineWidth = 1;
+    ctx.lineCap = 'round';
     ctx.beginPath();
-    ctx.moveTo(-8.5, headY - 1);
-    ctx.lineTo(-12, headY);
-    ctx.lineTo(-8, headY + 3);
-    
-    ctx.lineTo(-5, headY + 6); // locks on side
-    ctx.lineTo(-2, headY + 8);
-    
-    ctx.lineTo(0, headY - 3);
-    ctx.lineTo(4, headY - 6);
-    
-    ctx.lineTo(8.5, headY - 1);
-    ctx.lineTo(11, headY + 3);
-    ctx.lineTo(7, headY + 5);
-    ctx.fill();
+    ctx.moveTo(2.6, headY - 2.4);
+    ctx.lineTo(6, headY - 1.9);
+    ctx.stroke();
 
-    // Messy bangs on forehead
+    // Eye (white + iris + catchlight)
+    ctx.fillStyle = '#fdf6ee';
     ctx.beginPath();
-    ctx.moveTo(-8, headY - 3);
-    ctx.quadraticCurveTo(-2, headY - 6, 2, headY - 3);
-    ctx.lineTo(0, headY + 1);
+    ctx.ellipse(4.7, headY + 0.2, 1.9, 1.5, 0, 0, Math.PI * 2);
     ctx.fill();
-
-    // F. Cute shining eyes
+    ctx.fillStyle = '#241a12';
+    ctx.beginPath();
+    ctx.arc(5.3, headY + 0.3, 1, 0, Math.PI * 2);
+    ctx.fill();
     ctx.fillStyle = '#fff';
     ctx.beginPath();
-    ctx.arc(3, headY - 1, 1.8, 0, Math.PI * 2);
+    ctx.arc(5.0, headY - 0.2, 0.32, 0, Math.PI * 2);
     ctx.fill();
-    ctx.fillStyle = '#0f172a';
+
+    // Nose (small profile bump on the front edge)
+    ctx.strokeStyle = skinShade;
+    ctx.lineWidth = 1.1;
+    ctx.lineJoin = 'round';
     ctx.beginPath();
-    ctx.arc(4, headY - 1, 0.9, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(7.4, headY + 1.4);
+    ctx.lineTo(8.7, headY + 2.8);
+    ctx.lineTo(6.9, headY + 3.4);
+    ctx.stroke();
+
+    // Mouth
+    ctx.strokeStyle = '#7a2a16';
+    ctx.lineWidth = 0.9;
+    ctx.beginPath();
+    ctx.arc(4.6, headY + 5, 1.9, 0.2, Math.PI - 0.55);
+    ctx.stroke();
 
     ctx.restore();
   };
@@ -1295,7 +1394,7 @@ export default function GameCanvas({
   };
 
   return (
-    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden" id="gamer-box">
+    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden w-full max-w-[1312px] mx-auto" id="gamer-box">
       
       {/* Top HUD Row */}
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
@@ -1320,10 +1419,10 @@ export default function GameCanvas({
       </div>
 
       {/* Main retro gaming box canvas container */}
-      <div className="w-full relative bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-[1280px] aspect-[16/9] mx-auto bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
         <canvas
           ref={canvasRef}
-          className="w-full block h-[420px] bg-slate-900 cursor-crosshair"
+          className="w-full h-full block bg-slate-900 cursor-crosshair"
           title={t.canvasTitle}
           id="jungle-platformer-canvas"
         />

@@ -9,8 +9,10 @@ import { audioSynth } from '../audio';
 import { Landmark, Swords, Play } from 'lucide-react';
 import { Lang, UI } from '../i18n';
 
-// --- Arena geometry (fixed single screen, no scroll). Mowgli ~1/3 of the
-// 420px canvas height. ---
+// --- Arena geometry (fixed single screen, no scroll). The arena is authored
+// in a 420-tall world (Mowgli ~1/3 of it) and rendered scaled up to the
+// canvas's 720p pixel height. ---
+const BASE_H = 420;
 const GROUND_Y = 366;
 const MOVE_SPEED = 2.7;
 const AI_SPEED = 2.2;
@@ -105,7 +107,7 @@ export default function FighterCanvas({
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    resetFight(canvas.clientWidth || 800);
+    resetFight((canvas.clientWidth || 800) * BASE_H / 720); // world-space arena width
     audioSynth.startJungleMusic();
   }, [fight]);
 
@@ -129,11 +131,14 @@ export default function FighterCanvas({
 
     const resizeCanvas = () => {
       const rect = canvas.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = 420;
+      // 16:9 window — back the canvas with its actual displayed size.
+      canvas.width = Math.round(rect.width) || 1280;
+      canvas.height = Math.round(rect.height) || 720;
     };
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
+    const resizeObserver = new ResizeObserver(() => resizeCanvas());
+    resizeObserver.observe(canvas);
 
     let lastStamp = performance.now();
     let wasAttackPressed = false;
@@ -145,9 +150,15 @@ export default function FighterCanvas({
       lastStamp = timestamp;
       s.tick += 1;
 
+      // Scale the 420-tall arena up to the canvas's pixel height; `view`
+      // reports the world-space viewport (W) so all positioning is unchanged.
+      const renderScale = canvas.height / BASE_H;
+      const view = { width: canvas.width / renderScale, height: BASE_H };
+      ctx.setTransform(renderScale, 0, 0, renderScale, 0, 0);
+
       const p = s.player;
       const o = s.opponent;
-      const W = canvas.width;
+      const W = view.width;
 
       // Always face toward the other fighter
       p.facing = p.x <= o.x ? 1 : -1;
@@ -254,7 +265,7 @@ export default function FighterCanvas({
         return part.life < part.maxLife;
       });
 
-      drawScene(ctx, canvas, s);
+      drawScene(ctx, view, s);
       s.frameId = requestAnimationFrame(loop);
     };
 
@@ -265,6 +276,7 @@ export default function FighterCanvas({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
       window.removeEventListener('resize', resizeCanvas);
+      resizeObserver.disconnect();
     };
   }, [fight, paused, won]);
 
@@ -318,7 +330,7 @@ export default function FighterCanvas({
     return 0;
   };
 
-  const drawScene = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, s: typeof stateRef.current) => {
+  const drawScene = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, s: typeof stateRef.current) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     drawVillageBackground(ctx, canvas, s.tick);
 
@@ -345,11 +357,11 @@ export default function FighterCanvas({
 
     // Lose speech bubble over Mowgli's head
     if (s.phase === 'player_lose') {
-      drawSpeechBubble(ctx, s.player.x, GROUND_Y - 150, t.fighterLoseBubble);
+      drawSpeechBubble(ctx, s.player.x, GROUND_Y - 150, t.fighterLoseBubble, canvas.width);
     }
   };
 
-  const drawVillageBackground = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, tick: number) => {
+  const drawVillageBackground = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, tick: number) => {
     // Dusk sky
     const sky = ctx.createLinearGradient(0, 0, 0, GROUND_Y);
     sky.addColorStop(0, '#2a1a3a');
@@ -623,7 +635,7 @@ export default function FighterCanvas({
     ctx.restore();
   };
 
-  const drawHud = (ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement, s: typeof stateRef.current) => {
+  const drawHud = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, s: typeof stateRef.current) => {
     const barW = Math.min(260, canvas.width / 2 - 40);
     drawHealthBar(ctx, 20, 16, barW, nameFor(s.player.sprite), s.player.hp, s.player.maxHp, false);
     drawHealthBar(ctx, canvas.width - 20 - barW, 16, barW, nameFor(s.opponent.sprite), s.opponent.hp, s.opponent.maxHp, true);
@@ -659,13 +671,13 @@ export default function FighterCanvas({
     ctx.fillText(`${name}  ${Math.ceil(hp)} HP`, rightAlign ? x + w : x, y + 30);
   };
 
-  const drawSpeechBubble = (ctx: CanvasRenderingContext2D, cx: number, cy: number, text: string) => {
+  const drawSpeechBubble = (ctx: CanvasRenderingContext2D, cx: number, cy: number, text: string, maxX: number) => {
     ctx.font = '13px sans-serif';
     const padding = 12;
     const textW = ctx.measureText(text).width;
     const bw = textW + padding * 2;
     const bh = 34;
-    const bx = Math.max(8, Math.min(cx - bw / 2, ctx.canvas.width - bw - 8));
+    const bx = Math.max(8, Math.min(cx - bw / 2, maxX - bw - 8));
     const by = cy - bh;
     ctx.fillStyle = 'rgba(248, 250, 252, 0.96)';
     ctx.strokeStyle = '#1e293b';
@@ -690,7 +702,7 @@ export default function FighterCanvas({
   const press = (key: string, down: boolean) => { stateRef.current.keys[key] = down; };
 
   return (
-    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden" id="fighter-box">
+    <div className="flex flex-col items-center bg-slate-950/80 border-4 border-slate-900 rounded-3xl p-4 shadow-inner relative overflow-hidden w-full max-w-[1312px] mx-auto" id="fighter-box">
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-amber-400" />
@@ -705,10 +717,10 @@ export default function FighterCanvas({
         </button>
       </div>
 
-      <div className="w-full relative bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
+      <div className="relative w-full max-w-[1280px] aspect-[16/9] mx-auto bg-slate-900 border-2 border-slate-800/80 rounded-2xl overflow-hidden shadow-2xl">
         <canvas
           ref={canvasRef}
-          className="w-full block h-[420px] bg-slate-900 cursor-crosshair"
+          className="w-full h-full block bg-slate-900 cursor-crosshair"
           id="fighter-canvas"
         />
 

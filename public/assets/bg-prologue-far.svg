@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <radialGradient id="blaze" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb24d" stop-opacity="0.7"/>
+      <stop offset="0.5" stop-color="#f2641e" stop-opacity="0.35"/>
+      <stop offset="1" stop-color="#f2641e" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softP"><feGaussianBlur stdDeviation="4"/></filter>
+  </defs>
+
+  <!-- glowing fires behind the village -->
+  <g filter="url(#softP)">
+    <ellipse cx="430" cy="450" rx="120" ry="70" fill="url(#blaze)"/>
+    <ellipse cx="760" cy="470" rx="150" ry="80" fill="url(#blaze)"/>
+    <ellipse cx="1060" cy="455" rx="110" ry="64" fill="url(#blaze)"/>
+  </g>
+
+  <!-- village rooftops + jungle silhouette against the blaze -->
+  <g fill="#0b0503" opacity="0.92">
+    <path d="M0,470 L1280,470 L1280,560 L0,560 Z"/>
+    <!-- pitched roofs -->
+    <path d="M360,470 L410,418 L460,470 Z"/>
+    <path d="M520,470 L585,402 L650,470 Z"/>
+    <path d="M700,470 L756,410 L812,470 Z"/>
+    <path d="M960,470 L1015,415 L1070,470 Z"/>
+    <!-- ragged tree-line over the rooftops -->
+    <path d="M0,470 Q70,418 150,452 T300,440 T470,455 T640,432 T820,452 T1000,438 T1180,456 T1280,446 L1280,470 L0,470 Z"/>
+  </g>
+</svg>
