@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <linearGradient id="far" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#103e30"/>
+      <stop offset="1" stop-color="#0a261c"/>
+    </linearGradient>
+    <filter id="softFar"><feGaussianBlur stdDeviation="5.5"/></filter>
+  </defs>
+  <g filter="url(#softFar)" opacity="0.5">
+    <path d="M0,300 Q90,232 180,284 T360,268 T540,296 T720,252 T900,286 T1080,258 T1280,282
+             L1280,470 L0,470 Z" fill="url(#far)"/>
+    <!-- a couple of taller distant trunks for depth -->
+    <rect x="300" y="250" width="26" height="220" rx="10" fill="#0c2c21"/>
+    <rect x="860" y="236" width="30" height="234" rx="12" fill="#0c2c21"/>
+  </g>
+</svg>

@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+  <defs>
+    <radialGradient id="leaf" cx="0.5" cy="0.28" r="0.75">
+      <stop offset="0" stop-color="#114433"/>
+      <stop offset="1" stop-color="#05241a"/>
+    </radialGradient>
+    <filter id="blurV"><feGaussianBlur stdDeviation="2.5"/></filter>
+    <filter id="leafTex" x="-12%" y="-12%" width="124%" height="124%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.035 0.05" numOctaves="2" seed="5" result="n"/>
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="16"/>
+    </filter>
+  </defs>
+
+  <!-- hanging vines -->
+  <g stroke="#0d3527" stroke-width="5" fill="none" opacity="0.75" filter="url(#blurV)">
+    <path d="M250,30 q15,95 -6,176 q-12,62 9,126"/>
+    <path d="M620,20 q-10,70 4,140 q12,66 -8,150"/>
+    <path d="M980,28 q-16,84 6,158 q14,72 -6,146"/>
+  </g>
+
+  <!-- foliage hanging from the top edge (framing canopy) -->
+  <g filter="url(#leafTex)" opacity="0.94">
+    <ellipse cx="110" cy="-26" rx="210" ry="128" fill="url(#leaf)"/>
+    <ellipse cx="400" cy="-44" rx="178" ry="104" fill="url(#leaf)"/>
+    <ellipse cx="690" cy="-30" rx="206" ry="122" fill="url(#leaf)"/>
+    <ellipse cx="980" cy="-46" rx="180" ry="108" fill="url(#leaf)"/>
+    <ellipse cx="1230" cy="-28" rx="208" ry="126" fill="url(#leaf)"/>
+  </g>
+</svg>

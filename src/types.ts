@@ -86,6 +86,10 @@ export interface PuzzleGate {
   questions: PuzzleQuestion[];
 }
 
+// Background art for a level. Presets reference the layered SVG sets already
+// shipped in /public/assets; a per-level custom image (data URL) overrides them.
+export type LevelBackgroundId = 'jungle' | 'night_raid';
+
 export interface Level {
   id: number;
   name: string;
@@ -100,6 +104,8 @@ export interface Level {
   timeLimit?: number; // seconds for timed levels
   collectibleBonusSeconds?: number; // default extra seconds per collectible on timed levels
   puzzle?: PuzzleGate;
+  background?: LevelBackgroundId;   // preset art set (defaults to 'jungle')
+  backgroundImage?: string;         // optional custom image (data URL) — overrides the preset
 }
 
 // --- Prologue: a stealth/crawling intro stage with its own simplified
