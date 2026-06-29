@@ -161,7 +161,7 @@ export const INITIAL_LEVELS: Level[] = [
       { id: 'l4-p7', x: 1520, y: 240, width: 180, height: 35, type: 'canopy_leaves' },
       { id: 'l4-p8', x: 1750, y: 380, width: 220, height: 40, type: 'jungle_brick' },
       { id: 'l4-p9', x: 1980, y: 320, width: 170, height: 35, type: 'canopy_leaves' },
-      { id: 'l4-p10', x: 2140, y: 280, width: 160, height: 35, type: 'canopy_leaves' }
+      { id: 'l4-p10', x: 2140, y: 280, width: 160, height: 40, type: 'jungle_brick' }
     ],
     toads: [
       { id: 'l4-t1', x: 640, y: 260, width: 44, height: 24, springForce: 19, color: '#38bdf8', isSquished: false, squishTimer: 0 },
