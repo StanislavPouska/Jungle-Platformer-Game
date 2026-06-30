@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Level } from './types';
 import { INITIAL_LEVELS } from './data';
 import LevelEditor from './components/LevelEditor';
@@ -11,17 +11,39 @@ import { Lang, UI, LANGUAGES } from './i18n';
 import { readSaveData, writeLevelsToSave, readSavedLang, LANG_KEY } from './storage';
 import { SquarePen } from 'lucide-react';
 
+// Merge any saved levels with the full built-in set, keyed by id, so an old or
+// partial save (e.g. from before the game grew to 10 levels) never hides
+// levels in the editor. Saved edits win where ids match; custom levels (ids not
+// in the defaults) are kept and appended.
+function seedLevels(): Level[] {
+  const saved = readSaveData()?.levels ?? [];
+  if (!saved.length) return JSON.parse(JSON.stringify(INITIAL_LEVELS));
+  const byId = new Map(saved.map((l) => [l.id, l]));
+  const merged: Level[] = INITIAL_LEVELS.map((def) => byId.get(def.id) ?? def);
+  for (const l of saved) {
+    if (!INITIAL_LEVELS.some((d) => d.id === l.id)) merged.push(l);
+  }
+  return JSON.parse(JSON.stringify(merged));
+}
+
 // Standalone host for the level editor — what editor.exe opens. Shares the
 // game's localStorage save, so designs made here appear in the game's Load and
 // in one-click Playtest (which navigates to index.html?play=N).
 export default function EditorApp() {
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
-  const [levels, setLevels] = useState<Level[]>(() => {
-    const saved = readSaveData();
-    return saved?.levels?.length ? saved.levels : JSON.parse(JSON.stringify(INITIAL_LEVELS));
-  });
+  const [levels, setLevels] = useState<Level[]>(seedLevels);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const t = UI[language];
+
+  // If the seed recovered levels a stale/partial save was missing, persist the
+  // upgraded set so the game's Load and future opens stay consistent.
+  useEffect(() => {
+    const savedCount = readSaveData()?.levels?.length ?? 0;
+    if (savedCount > 0 && savedCount < levels.length) {
+      writeLevelsToSave(levels);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleLevelsChange = (next: Level[]) => {
     setLevels(next);

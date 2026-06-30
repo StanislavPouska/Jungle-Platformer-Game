@@ -5,12 +5,14 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { Level, Platform, Toad, Collectible, LevelBackgroundId } from '../types';
+import { INITIAL_LEVELS } from '../data';
 import { Lang, UI } from '../i18n';
 import {
   Plus,
   Copy,
   Trash2,
   Play,
+  RotateCcw,
   Flag,
   DoorOpen,
   Upload,
@@ -294,6 +296,13 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
     selectLevel(clamp(index, 0, next.length - 1));
   };
 
+  // Restore the canonical built-in level set (recovers from a stale save).
+  const handleReset = () => {
+    if (!window.confirm(t.editorConfirmReset)) return;
+    onLevelsChange(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
+    selectLevel(0);
+  };
+
   // ---- background -----------------------------------------------------------
   const downscaleImage = (file: File, maxW: number): Promise<string> =>
     new Promise((resolve, reject) => {
@@ -415,6 +424,9 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
             </div>
             <button onClick={() => onPlaytest(index)} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-pink-600 hover:from-fuchsia-600 hover:to-pink-700 text-white font-bold text-xs cursor-pointer shadow-lg shadow-fuchsia-950/30" id="editor-playtest">
               <Play className="w-4 h-4" />{t.editorPlaytest}
+            </button>
+            <button onClick={handleReset} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#0c0419] hover:bg-purple-950/50 border border-purple-900/50 text-gray-400 hover:text-gray-200 text-[11px] cursor-pointer" id="editor-reset-levels" title={t.editorReset}>
+              <RotateCcw className="w-3.5 h-3.5" />{t.editorReset}
             </button>
           </div>
 

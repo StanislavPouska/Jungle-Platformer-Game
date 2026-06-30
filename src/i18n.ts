@@ -214,6 +214,8 @@ export const UI = {
     editorNewLevelName: 'New Level',
     editorNewLevelDesc: 'A freshly designed jungle stage.',
     editorConfirmDelete: 'Delete this level?',
+    editorReset: 'Reset to defaults',
+    editorConfirmReset: 'Replace all levels with the original built-in set? Your level edits will be lost.',
   },
   cs: {
     brandTag1: '2D BOČNÍ POHLED',
@@ -416,6 +418,8 @@ export const UI = {
     editorNewLevelName: 'Nová Úroveň',
     editorNewLevelDesc: 'Čerstvě navržená džunglová úroveň.',
     editorConfirmDelete: 'Smazat tuto úroveň?',
+    editorReset: 'Obnovit výchozí',
+    editorConfirmReset: 'Nahradit všechny úrovně původní vestavěnou sadou? Vaše úpravy úrovní budou ztraceny.',
   },
 };
 
