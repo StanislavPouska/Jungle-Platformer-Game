@@ -4,11 +4,12 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { PrologueLevel, StepPlatform, HidingSpot } from '../types';
+import { StealthMission, StepPlatform, HidingSpot, TriggerPlacement, FightDef, QuizDef } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, RotateCcw, Play } from 'lucide-react';
-import { Lang, UI } from '../i18n';
-import { preloadAssets, getImage, tileParallax } from '../assets';
+import { Lang, UI, getMissionText } from '../i18n';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import GateOverlays from './GateOverlays';
 
 preloadAssets();
 
@@ -37,7 +38,7 @@ const getGroundYAt = (platforms: StepPlatform[], x: number): number => {
 // Scans the level so the camera knows the full vertical extent of ground,
 // hiding spots, and the tiger's reach — otherwise the bottom of the ground
 // fill (and Mowgli himself when not hidden) can sit below the canvas.
-const computeVerticalBounds = (level: PrologueLevel) => {
+const computeVerticalBounds = (level: StealthMission) => {
   let minY = Infinity;
   let maxY = -Infinity;
   level.platforms.forEach((p) => {
@@ -52,28 +53,46 @@ const computeVerticalBounds = (level: PrologueLevel) => {
   return { minY, maxY };
 };
 
-interface PrologueCanvasProps {
-  prologue: PrologueLevel;
+interface StealthCanvasProps {
+  mission: StealthMission;
+  fights: FightDef[];
+  quizzes: QuizDef[];
   language: Lang;
   onComplete: () => void;
   paused: boolean;
   onTogglePause: () => void;
 }
 
-export default function PrologueCanvas({
-  prologue,
+export default function StealthCanvas({
+  mission: prologue,
+  fights,
+  quizzes,
   language,
   onComplete,
   paused,
   onTogglePause,
-}: PrologueCanvasProps) {
+}: StealthCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const t = UI[language];
+  const missionText = getMissionText(prologue, language);
 
   const [controlsPrompt, setControlsPrompt] = useState(true);
   const [caught, setCaught] = useState(false);
   const [escaped, setEscaped] = useState(false);
   const [deaths, setDeaths] = useState(0);
+
+  // Trigger gate state — same behavior as the platformer canvas: an invisible
+  // wall stops the crawl until the referenced quiz is solved / fight is won.
+  const [activeTrigger, setActiveTrigger] = useState<TriggerPlacement | null>(null);
+  const [gateStage, setGateStage] = useState<'card' | 'run'>('run');
+  const [puzzleAnswers, setPuzzleAnswers] = useState<number[]>([]);
+  const [puzzleFeedback, setPuzzleFeedback] = useState<'idle' | 'wrong'>('idle');
+  const gateOpenedRef = useRef(false);
+
+  const activeQuiz =
+    activeTrigger?.kind === 'quiz' ? quizzes.find((q) => q.id === activeTrigger.refId) ?? null : null;
+  const activeFight =
+    activeTrigger?.kind === 'fight' ? fights.find((f) => f.id === activeTrigger.refId) ?? null : null;
 
   const stateRef = useRef({
     player: {
@@ -106,6 +125,8 @@ export default function PrologueCanvas({
     frameId: 0,
     deathTimer: 0,
     levelLength: prologue.levelMaxX + 200,
+    clearedTriggers: {} as Record<string, boolean>,
+    pendingTriggerId: null as string | null,
   });
 
   // Reset on mount/replay
@@ -129,6 +150,13 @@ export default function PrologueCanvas({
     s.worldMinY = verticalBounds.minY;
     s.worldMaxY = verticalBounds.maxY;
     s.deathTimer = 0;
+    s.clearedTriggers = {};
+    s.pendingTriggerId = null;
+    gateOpenedRef.current = false;
+    setActiveTrigger(null);
+    setGateStage('run');
+    setPuzzleFeedback('idle');
+    setPuzzleAnswers([]);
     setCaught(false);
     setEscaped(false);
     audioSynth.startJungleMusic();
@@ -168,7 +196,9 @@ export default function PrologueCanvas({
     let wasDownPressed = false;
 
     const loop = (timestamp: number) => {
-      if (paused || escaped) return;
+      // Freeze while paused, after escaping, or while a trigger gate (quiz
+      // modal / chapter card / fight overlay) is up.
+      if (paused || escaped || activeTrigger) return;
 
       const s = stateRef.current;
       const dt = timestamp - lastStamp;
@@ -199,6 +229,20 @@ export default function PrologueCanvas({
       const upPressed = !!(s.keys['arrowup'] || s.keys['w']);
       const downPressed = !!(s.keys['arrowdown'] || s.keys['s']);
 
+      // Opt-in state mirror for automated playtesting (window.__DBG truthy).
+      if ((window as any).__DBG) {
+        (window as any).__stealthDbg = {
+          x: p.x,
+          tigerX: s.tiger.x,
+          tigerDir: s.tiger.dir,
+          hidden: p.hidden,
+          hunting: s.tiger.huntDelayRemaining <= 0 && !s.sequence.active,
+          seqPhase: s.sequence.active ? s.sequence.phase : null,
+          spots: prologue.hidingSpots.map((hs) => ({ cx: hs.x + hs.width / 2, id: hs.id })),
+          goalId: prologue.goalSpotId,
+        };
+      }
+
       if (!p.hidden) {
         let moveDir = 0;
         if (s.keys['a'] || s.keys['arrowleft']) { moveDir = -1; p.facing = 'left'; }
@@ -207,6 +251,15 @@ export default function PrologueCanvas({
         p.x += p.vx;
         if (p.x < prologue.levelMinX + 14) p.x = prologue.levelMinX + 14;
         if (p.x > prologue.levelMaxX - 14) p.x = prologue.levelMaxX - 14;
+
+        // Trigger gates: invisible walls block the crawl until the referenced
+        // quiz is solved / fight is won
+        for (const tr of prologue.triggers) {
+          if (!s.clearedTriggers[tr.id] && p.x + PLAYER_W > tr.triggerX) {
+            p.x = tr.triggerX - PLAYER_W;
+            s.pendingTriggerId = tr.id;
+          }
+        }
 
         const targetY = getGroundYAt(prologue.platforms, p.x);
         p.y += Math.max(-CLIMB_SPEED, Math.min(CLIMB_SPEED, targetY - p.y));
@@ -307,6 +360,34 @@ export default function PrologueCanvas({
         }
       }
 
+      // TRIGGER GATES: open the referenced quiz/fight the first time the
+      // player bumps into an uncleared trigger wall. Placements pointing at a
+      // deleted library object are auto-cleared so they can never soft-lock.
+      if (s.pendingTriggerId && !gateOpenedRef.current) {
+        const tr = prologue.triggers.find((x) => x.id === s.pendingTriggerId);
+        s.pendingTriggerId = null;
+        // The id can be stale from frames rendered between gate-open and the
+        // React freeze — never reopen a gate that's already been cleared.
+        if (tr && !s.clearedTriggers[tr.id]) {
+          const exists =
+            tr.kind === 'quiz'
+              ? quizzes.some((q) => q.id === tr.refId)
+              : fights.some((f) => f.id === tr.refId);
+          if (!exists) {
+            s.clearedTriggers[tr.id] = true;
+          } else {
+            gateOpenedRef.current = true;
+            if (tr.kind === 'quiz') {
+              const quiz = quizzes.find((q) => q.id === tr.refId)!;
+              setPuzzleAnswers(new Array(quiz.questions.length).fill(-1));
+              setPuzzleFeedback('idle');
+            }
+            setGateStage(tr.kind === 'fight' && tr.chapterCard ? 'card' : 'run');
+            setActiveTrigger(tr);
+          }
+        }
+      }
+
       // Camera
       const optimalCamX = p.x - view.width / 2.5;
       const maxScroll = Math.max(0, s.levelLength - view.width);
@@ -330,7 +411,54 @@ export default function PrologueCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [prologue, paused, escaped]);
+  }, [prologue, paused, escaped, activeTrigger]);
+
+  // ---- trigger gate resolutions ---------------------------------------------
+  const closeGate = () => {
+    gateOpenedRef.current = false;
+    setActiveTrigger(null);
+    setGateStage('run');
+  };
+
+  const handlePuzzleChoice = (questionIdx: number, choiceIdx: number) => {
+    setPuzzleAnswers((prev) => {
+      const next = [...prev];
+      next[questionIdx] = choiceIdx;
+      return next;
+    });
+    setPuzzleFeedback('idle');
+  };
+
+  const handlePuzzleSubmit = () => {
+    if (!activeTrigger || !activeQuiz) return;
+    const allCorrect = activeQuiz.questions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
+    if (allCorrect) {
+      stateRef.current.clearedTriggers[activeTrigger.id] = true;
+      setPuzzleFeedback('idle');
+      closeGate();
+      audioSynth.playLevelSuccess();
+    } else {
+      setPuzzleFeedback('wrong');
+      audioSynth.playWrongAnswer();
+    }
+  };
+
+  const handleFightWin = () => {
+    if (activeTrigger) stateRef.current.clearedTriggers[activeTrigger.id] = true;
+    closeGate();
+  };
+
+  const handleFightLose = () => {
+    // Losing a non-retry fight sends the toddler back to the start (like
+    // being caught); the trigger re-arms on the way back.
+    const s = stateRef.current;
+    closeGate();
+    s.player.x = prologue.startX;
+    s.player.y = getGroundYAt(prologue.platforms, prologue.startX);
+    s.player.hidden = false;
+    s.player.hidingSpotId = null;
+    setDeaths((d) => d + 1);
+  };
 
   const drawEyes = (ctx: CanvasRenderingContext2D, cx: number, cy: number, frameId: number, phase: number, glow: string) => {
     const blinkCycle = Math.sin(frameId / 18 + phase);
@@ -377,12 +505,18 @@ export default function PrologueCanvas({
   const drawScene = (ctx: CanvasRenderingContext2D, canvas: { width: number; height: number }, s: typeof stateRef.current) => {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    // Layered atmospheric backdrop (painted assets with procedural fallback)
-    const skyImg = getImage('bgPrologueSky');
-    const farImg = getImage('bgPrologueFar');
-    const nearImg = getImage('bgPrologueNear');
+    // Layered atmospheric backdrop — per-mission: custom uploaded image first,
+    // then the chosen preset's layers, then a procedural burning-night fallback.
+    const customBg = prologue.backgroundImage ? getImageFromDataUrl(prologue.backgroundImage) : null;
+    const preset = LEVEL_BACKGROUNDS[prologue.background ?? 'night_raid'] ?? LEVEL_BACKGROUNDS.night_raid;
+    const skyImg = customBg ? null : getImage(preset.sky);
+    const farImg = customBg ? null : getImage(preset.far);
+    const nearImg = customBg ? null : getImage(preset.near);
 
-    if (skyImg) {
+    if (customBg) {
+      // Custom backdrop fills the whole view (no parallax layers).
+      ctx.drawImage(customBg, 0, 0, canvas.width, canvas.height);
+    } else if (skyImg) {
       ctx.drawImage(skyImg, 0, 0, canvas.width, canvas.height);
     } else {
       const sky = ctx.createLinearGradient(0, 0, 0, canvas.height);
@@ -396,7 +530,7 @@ export default function PrologueCanvas({
     if (farImg) {
       // Burning village / tree-line on the horizon (scroll speed 0.15)
       tileParallax(ctx, farImg, canvas.width, canvas.width, canvas.height, 0, s.cameraX * 0.15);
-    } else {
+    } else if (!customBg) {
       for (let i = 0; i < 4; i++) {
         const gx = (i * 420 - s.cameraX * 0.15) % (canvas.width + 300);
         const glow = ctx.createRadialGradient(gx, canvas.height - 60, 5, gx, canvas.height - 60, 90);
@@ -651,7 +785,7 @@ export default function PrologueCanvas({
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-orange-400" />
-          <span className="text-orange-300 font-bold uppercase tracking-wider">{t.prologueStage}</span>
+          <span className="text-orange-300 font-bold uppercase tracking-wider">{missionText.name}</span>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-rose-300 font-semibold">{deaths > 0 ? `x${deaths}` : ''}</span>
@@ -756,6 +890,24 @@ export default function PrologueCanvas({
           </button>
         </div>
       </div>
+
+      {/* Trigger gate overlays: quiz modal / chapter card / fight arena */}
+      <GateOverlays
+        trigger={activeTrigger}
+        stage={gateStage}
+        quiz={activeQuiz}
+        fight={activeFight}
+        answers={puzzleAnswers}
+        feedback={puzzleFeedback}
+        onChoice={handlePuzzleChoice}
+        onSubmit={handlePuzzleSubmit}
+        onCardBegin={() => setGateStage('run')}
+        onFightWin={handleFightWin}
+        onFightLose={handleFightLose}
+        language={language}
+        paused={paused}
+        onTogglePause={onTogglePause}
+      />
     </div>
   );
 }

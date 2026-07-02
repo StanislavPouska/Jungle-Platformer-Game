@@ -3,8 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Level, PuzzleGate, PrologueLevel, FightConfig } from './types';
-import { INITIAL_LEVELS } from './data';
+import { Mission, QuizDef, FightDef } from './types';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES } from './data';
 
 export type Lang = 'en' | 'cs';
 
@@ -169,14 +169,14 @@ export const UI = {
     editorGroupPlatforms: 'Platforms',
     editorGroupCreatures: 'Creatures',
     editorGroupCollectibles: 'Collectibles',
-    editorLevelsHeader: 'Levels',
+    editorLevelsHeader: 'Missions',
     editorNewLevel: 'New',
     editorDuplicate: 'Duplicate',
     editorDelete: 'Delete',
     editorPlaytest: '▶ Playtest',
     editorInspector: 'Properties',
     editorNoSelection: 'Select an item on the canvas to edit it, or add one from the toolbox.',
-    editorLevelSettings: 'Level Settings',
+    editorLevelSettings: 'Mission Settings',
     editorName: 'Name',
     editorDescription: 'Description',
     editorTimedLevel: 'Timed level',
@@ -212,15 +212,80 @@ export const UI = {
     palBanana: 'Banana',
     palMango: 'Mango',
     palStar: 'Star',
-    editorNewLevelName: 'New Level',
+    editorNewLevelName: 'New Mission',
     editorNewLevelDesc: 'A freshly designed jungle stage.',
-    editorConfirmDelete: 'Delete this level?',
+    editorConfirmDelete: 'Delete this mission?',
     editorReset: 'Reset to defaults',
-    editorConfirmReset: 'Replace all levels with the original built-in set? Your level edits will be lost.',
+    editorConfirmReset: 'Replace all missions, fights, and quizzes with the original built-in set? Your edits will be lost.',
     editorMarkerPuzzle: 'Riddle Gate',
     editorPuzzleHint: 'Invisible quiz wall — the player must answer the riddle here to pass.',
     editorBgUploadFailed: 'Image could not be loaded.',
     editorSaveFailed: 'Autosave failed — browser storage may be full.',
+
+    // Editor — mission types, stealth items, trigger placements
+    editorTabMissions: 'Missions',
+    editorTabFights: 'Fights',
+    editorTabQuizzes: 'Quizzes',
+    editorMissionType: 'Mission type',
+    editorTypePlatformer: 'Platformer',
+    editorTypeStealth: 'Stealth',
+    editorChapter: 'Chapter',
+    editorNewPlatformer: '+ Platformer',
+    editorNewStealth: '+ Stealth',
+    editorNewStealthDesc: 'A freshly designed stealth crawl through the night jungle.',
+    editorGroupTerrain: 'Terrain',
+    editorGroupTriggers: 'Triggers',
+    palStepPlatform: 'Ground Step',
+    palHidingSpot: 'Hiding Spot',
+    palFightTrigger: 'Fight Trigger',
+    palQuizGate: 'Quiz Gate',
+    editorTriggerFight: 'Fight Trigger',
+    editorTriggerQuiz: 'Quiz Gate',
+    editorTriggerHint: 'Invisible wall — the player must clear the launched object here to pass.',
+    editorTriggerRef: 'Launches',
+    editorMarkerTiger: 'Tiger start',
+    editorFieldTigerSpeed: 'Tiger speed',
+    editorFieldMinX: 'World min X',
+    editorFieldMaxX: 'World max X',
+    editorSpotKind: 'Spot kind',
+    spotCave: 'Cave',
+    spotLeafShadow: 'Leaf shadow',
+    spotGoalCave: 'Goal cave (den)',
+    editorGoalSpotNote: 'This is the goal — reaching it completes the mission.',
+
+    // Editor — fight library
+    editorFightsHeader: 'Fight Library',
+    editorNewFightName: 'New Fight',
+    editorNewFightDesc: 'A fresh one-on-one duel.',
+    editorFightPlayer: 'Mowgli (player)',
+    editorFightOpponent: 'Opponent',
+    editorFieldSprite: 'Sprite',
+    spriteMowgliTorch: 'Mowgli with torch',
+    spriteShereKhan: 'Shere Khan',
+    editorFieldMaxHp: 'Max HP',
+    editorFieldDamage: 'Damage',
+    editorFieldParry: 'Parry chance (0–1)',
+    editorRestartOnLose: 'On loss: retry the fight (otherwise: death + mission restart)',
+    editorFightBg: 'Arena',
+    fightBgVillage: 'Village fence',
+
+    // Editor — quiz library
+    editorQuizzesHeader: 'Quiz Library',
+    editorNewQuizTitle: 'New Quiz',
+    editorNewQuizIntro: 'Answer every question correctly to pass.',
+    editorNewQuestion: 'A new question?',
+    editorQuizIntro: 'Intro',
+    editorQuestions: 'Questions',
+    editorQuestionLabel: 'Question',
+    editorAddQuestion: 'Add question',
+    editorAddChoice: 'Add choice',
+    editorCorrectPick: 'correct',
+    editorChoiceLabel: 'Choice',
+
+    editorUsedBy: 'Placed in',
+    editorCascadeConfirm1: 'This object is launched by triggers in: ',
+    editorCascadeConfirm2: '. Deleting it will also remove those triggers. Continue?',
+    editorConfirmDeleteObject: 'Delete this object?',
   },
   cs: {
     brandTag1: '2D BOČNÍ POHLED',
@@ -377,14 +442,14 @@ export const UI = {
     editorGroupPlatforms: 'Plošiny',
     editorGroupCreatures: 'Tvorové',
     editorGroupCollectibles: 'Sběratelské',
-    editorLevelsHeader: 'Úrovně',
+    editorLevelsHeader: 'Mise',
     editorNewLevel: 'Nová',
     editorDuplicate: 'Duplikovat',
     editorDelete: 'Smazat',
     editorPlaytest: '▶ Vyzkoušet',
     editorInspector: 'Vlastnosti',
     editorNoSelection: 'Vyber prvek na plátně k úpravě, nebo přidej nový z nástrojů.',
-    editorLevelSettings: 'Nastavení Úrovně',
+    editorLevelSettings: 'Nastavení Mise',
     editorName: 'Název',
     editorDescription: 'Popis',
     editorTimedLevel: 'Časovaná úroveň',
@@ -420,15 +485,80 @@ export const UI = {
     palBanana: 'Banán',
     palMango: 'Mango',
     palStar: 'Hvězda',
-    editorNewLevelName: 'Nová Úroveň',
+    editorNewLevelName: 'Nová Mise',
     editorNewLevelDesc: 'Čerstvě navržená džunglová úroveň.',
-    editorConfirmDelete: 'Smazat tuto úroveň?',
+    editorConfirmDelete: 'Smazat tuto misi?',
     editorReset: 'Obnovit výchozí',
-    editorConfirmReset: 'Nahradit všechny úrovně původní vestavěnou sadou? Vaše úpravy úrovní budou ztraceny.',
+    editorConfirmReset: 'Nahradit všechny mise, souboje a kvízy původní vestavěnou sadou? Vaše úpravy budou ztraceny.',
     editorMarkerPuzzle: 'Hádanková Brána',
     editorPuzzleHint: 'Neviditelná kvízová zeď — hráč zde musí zodpovědět hádanku, aby prošel.',
     editorBgUploadFailed: 'Obrázek se nepodařilo načíst.',
     editorSaveFailed: 'Automatické uložení selhalo — úložiště prohlížeče může být plné.',
+
+    // Editor — typy misí, plíživé prvky, spouštěče
+    editorTabMissions: 'Mise',
+    editorTabFights: 'Souboje',
+    editorTabQuizzes: 'Kvízy',
+    editorMissionType: 'Typ mise',
+    editorTypePlatformer: 'Plošinovka',
+    editorTypeStealth: 'Plížení',
+    editorChapter: 'Kapitola',
+    editorNewPlatformer: '+ Plošinovka',
+    editorNewStealth: '+ Plížení',
+    editorNewStealthDesc: 'Čerstvě navržené plížení noční džunglí.',
+    editorGroupTerrain: 'Terén',
+    editorGroupTriggers: 'Spouštěče',
+    palStepPlatform: 'Terénní Stupeň',
+    palHidingSpot: 'Úkryt',
+    palFightTrigger: 'Spouštěč Souboje',
+    palQuizGate: 'Kvízová Brána',
+    editorTriggerFight: 'Spouštěč Souboje',
+    editorTriggerQuiz: 'Kvízová Brána',
+    editorTriggerHint: 'Neviditelná zeď — hráč zde musí zdolat spuštěný objekt, aby prošel.',
+    editorTriggerRef: 'Spouští',
+    editorMarkerTiger: 'Start tygra',
+    editorFieldTigerSpeed: 'Rychlost tygra',
+    editorFieldMinX: 'Min. X světa',
+    editorFieldMaxX: 'Max. X světa',
+    editorSpotKind: 'Druh úkrytu',
+    spotCave: 'Jeskyně',
+    spotLeafShadow: 'Stín listí',
+    spotGoalCave: 'Cílová jeskyně (doupě)',
+    editorGoalSpotNote: 'Toto je cíl — jeho dosažením se mise dokončí.',
+
+    // Editor — knihovna soubojů
+    editorFightsHeader: 'Knihovna Soubojů',
+    editorNewFightName: 'Nový Souboj',
+    editorNewFightDesc: 'Čerstvý souboj jeden na jednoho.',
+    editorFightPlayer: 'Mauglí (hráč)',
+    editorFightOpponent: 'Protivník',
+    editorFieldSprite: 'Vzhled',
+    spriteMowgliTorch: 'Mauglí s pochodní',
+    spriteShereKhan: 'Šér Chán',
+    editorFieldMaxHp: 'Max. HP',
+    editorFieldDamage: 'Poškození',
+    editorFieldParry: 'Šance na kryt (0–1)',
+    editorRestartOnLose: 'Při prohře: opakovat souboj (jinak: smrt + restart mise)',
+    editorFightBg: 'Aréna',
+    fightBgVillage: 'Vesnická ohrada',
+
+    // Editor — knihovna kvízů
+    editorQuizzesHeader: 'Knihovna Kvízů',
+    editorNewQuizTitle: 'Nový Kvíz',
+    editorNewQuizIntro: 'Odpověz správně na všechny otázky, abys prošel.',
+    editorNewQuestion: 'Nová otázka?',
+    editorQuizIntro: 'Úvod',
+    editorQuestions: 'Otázky',
+    editorQuestionLabel: 'Otázka',
+    editorAddQuestion: 'Přidat otázku',
+    editorAddChoice: 'Přidat možnost',
+    editorCorrectPick: 'správná',
+    editorChoiceLabel: 'Možnost',
+
+    editorUsedBy: 'Umístěno v',
+    editorCascadeConfirm1: 'Tento objekt spouštějí spouštěče v: ',
+    editorCascadeConfirm2: '. Jeho smazáním se odstraní i tyto spouštěče. Pokračovat?',
+    editorConfirmDeleteObject: 'Smazat tento objekt?',
   },
 };
 
@@ -439,9 +569,14 @@ interface LevelText {
   description: string;
 }
 
-// Only Czech overrides are stored here — English text lives on the Level
+// Only Czech overrides are stored here — English text lives on the Mission
 // objects themselves in data.ts and is used as the default/fallback.
-const LEVEL_TEXT_CS: Record<number, LevelText> = {
+// Keyed by mission id (0 = the stealth prologue).
+const MISSION_TEXT_CS: Record<number, LevelText> = {
+  0: {
+    name: 'Útok Šér Chána',
+    description: 'Šér Chán napadl vesnici! Mauglí jako malé batole se musí proplížit džunglí, schovávat se v jeskyních a stínech listů před číhajícím tygrem.',
+  },
   1: {
     name: 'Přechod Korunami Stromů',
     description: 'Skákej přes staré mechové kmeny a odrážej se na pomocných zelených žábách, aby ses dostal přes džunglové nebe!'
@@ -484,17 +619,17 @@ const LEVEL_TEXT_CS: Record<number, LevelText> = {
   },
 };
 
-export function getLevelText(level: Level, lang: Lang): LevelText {
-  if (lang === 'cs' && LEVEL_TEXT_CS[level.id]) {
-    // Only apply the canned Czech translation while the level still carries
+export function getMissionText(mission: Mission, lang: Lang): LevelText {
+  if (lang === 'cs' && MISSION_TEXT_CS[mission.id]) {
+    // Only apply the canned Czech translation while the mission still carries
     // its pristine built-in text — once the user renames or re-describes a
-    // level in the editor, their words win in every language.
-    const def = INITIAL_LEVELS.find((d) => d.id === level.id);
-    if (def && def.name === level.name && def.description === level.description) {
-      return LEVEL_TEXT_CS[level.id];
+    // mission in the editor, their words win in every language.
+    const def = INITIAL_MISSIONS.find((d) => d.id === mission.id);
+    if (def && def.name === mission.name && def.description === mission.description) {
+      return MISSION_TEXT_CS[mission.id];
     }
   }
-  return { name: level.name, description: level.description };
+  return { name: mission.name, description: mission.description };
 }
 
 interface PuzzleTextOverride {
@@ -503,10 +638,9 @@ interface PuzzleTextOverride {
   questions: { question: string; choices: string[] }[];
 }
 
-// Czech override for the Bandar-Log riddle gate (level 7). Keyed by the
-// puzzle's triggerX since it's the only stable identifier on PuzzleGate.
-const PUZZLE_TEXT_CS: Record<number, PuzzleTextOverride> = {
-  1010: {
+// Czech override for the Bandar-Log riddle gate, keyed by quiz id.
+const QUIZ_TEXT_CS: Record<string, PuzzleTextOverride> = {
+  'bandar-riddle': {
     title: 'Hádanková Brána Bandar-Logů',
     intro: "Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny tři otázky, abys mohl projít!",
     questions: [
@@ -526,32 +660,41 @@ const PUZZLE_TEXT_CS: Record<number, PuzzleTextOverride> = {
   },
 };
 
-export function getPuzzleText(puzzle: PuzzleGate, lang: Lang): PuzzleTextOverride {
-  const override = lang === 'cs' ? PUZZLE_TEXT_CS[puzzle.triggerX] : undefined;
-  if (override) return override;
+export function getQuizText(quiz: QuizDef, lang: Lang): PuzzleTextOverride {
+  if (lang === 'cs' && QUIZ_TEXT_CS[quiz.id]) {
+    // Same pristine rule as missions: the canned translation only applies
+    // while the quiz still matches its built-in content.
+    const def = INITIAL_QUIZZES.find((d) => d.id === quiz.id);
+    if (
+      def &&
+      def.title === quiz.title &&
+      def.intro === quiz.intro &&
+      JSON.stringify(def.questions) === JSON.stringify(quiz.questions)
+    ) {
+      return QUIZ_TEXT_CS[quiz.id];
+    }
+  }
   return {
-    title: puzzle.title,
-    intro: puzzle.intro,
-    questions: puzzle.questions.map((q) => ({ question: q.question, choices: q.choices })),
+    title: quiz.title,
+    intro: quiz.intro,
+    questions: quiz.questions.map((q) => ({ question: q.question, choices: q.choices })),
   };
 }
 
-const PROLOGUE_TEXT_CS: LevelText = {
-  name: 'Útok Šér Chána',
-  description: 'Šér Chán napadl vesnici! Mauglí jako malé batole se musí proplížit džunglí, schovávat se v jeskyních a stínech listů před číhajícím tygrem.',
+// Czech override for the final duel, keyed by fight id.
+const FIGHT_TEXT_CS: Record<string, LevelText> = {
+  'shere-khan-final': {
+    name: 'Poslední Zúčtování',
+    description: 'O mnoho let později se dospělý Mauglí vrací do vesnice s ohněm v ruce. Šér Chán přichází na poslední souboj před zraky vesničanů. Ukonči to.',
+  },
 };
 
-export function getPrologueText(prologue: PrologueLevel, lang: Lang): LevelText {
-  if (lang === 'cs') return PROLOGUE_TEXT_CS;
-  return { name: prologue.name, description: prologue.description };
-}
-
-const EPILOGUE_TEXT_CS: LevelText = {
-  name: 'Poslední Zúčtování',
-  description: 'O mnoho let později se dospělý Mauglí vrací do vesnice s ohněm v ruce. Šér Chán přichází na poslední souboj před zraky vesničanů. Ukonči to.',
-};
-
-export function getEpilogueText(fight: FightConfig, lang: Lang): LevelText {
-  if (lang === 'cs') return EPILOGUE_TEXT_CS;
+export function getFightText(fight: FightDef, lang: Lang): LevelText {
+  if (lang === 'cs' && FIGHT_TEXT_CS[fight.id]) {
+    const def = INITIAL_FIGHTS.find((d) => d.id === fight.id);
+    if (def && def.name === fight.name && def.description === fight.description) {
+      return FIGHT_TEXT_CS[fight.id];
+    }
+  }
   return { name: fight.name, description: fight.description };
 }

@@ -4,58 +4,61 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { Level } from './types';
-import { INITIAL_LEVELS } from './data';
+import { WorldData } from './types';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES } from './data';
 import LevelEditor from './components/LevelEditor';
 import { Lang, UI, LANGUAGES } from './i18n';
 import {
   readSaveData,
-  writeLevelsToSave,
-  scheduleLevelsSave,
-  flushLevelsSave,
+  writeWorldToSave,
+  scheduleWorldSave,
+  flushWorldSave,
   mergeWithDefaults,
   readSavedLang,
   LANG_KEY,
 } from './storage';
 import { SquarePen } from 'lucide-react';
 
-// Seed the editor's level list from the shared save, merged against the
-// built-in set: recovers levels an old/partial save is missing while keeping
-// the user's deliberate deletions deleted (knownDefaultIds tells them apart).
-function seedLevels(): Level[] {
+// Seed the editor's world from the shared save, merged against the built-in
+// set: recovers content an old/partial save is missing while keeping the
+// user's deliberate deletions deleted (knownDefaults tells them apart).
+function seedWorld(): WorldData {
   const saved = readSaveData();
-  if (!saved?.levels?.length) return JSON.parse(JSON.stringify(INITIAL_LEVELS));
-  return mergeWithDefaults(saved.levels, saved.knownDefaultIds);
+  if (!saved?.world?.missions?.length) {
+    return JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES }));
+  }
+  return mergeWithDefaults(saved.world, saved.knownDefaults);
 }
 
-// Standalone host for the level editor — what editor.exe opens. Shares the
-// game's localStorage save, so designs made here appear in the game's Load and
-// in one-click Playtest (which navigates to index.html?play=N).
+// Standalone host for the world editor — what editor.exe opens. Shares the
+// game's localStorage save, so missions designed here appear in the game's
+// Load and in one-click Playtest (which navigates to index.html?play=N).
 export default function EditorApp() {
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
-  const [levels, setLevels] = useState<Level[]>(seedLevels);
+  const [world, setWorld] = useState<WorldData>(seedWorld);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const t = UI[language];
 
-  // Re-stamp the save on mount: persists any levels the merge recovered and
-  // records knownDefaultIds so future deletions of built-ins stay durable.
+  // Re-stamp the save on mount: persists any content the merge recovered
+  // (or a v1→v2 migration produced) and records knownDefaults so future
+  // deletions of built-ins stay durable.
   useEffect(() => {
-    if (readSaveData()) writeLevelsToSave(levels);
+    if (readSaveData()) writeWorldToSave(world);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Autosaves are debounced — push any pending write out before the page
   // closes so the last edits aren't lost.
   useEffect(() => {
-    const flush = () => flushLevelsSave();
+    const flush = () => flushWorldSave();
     window.addEventListener('beforeunload', flush);
     return () => window.removeEventListener('beforeunload', flush);
   }, []);
 
-  const handleLevelsChange = (next: Level[]) => {
-    setLevels(next);
-    scheduleLevelsSave(next, (data) => {
+  const handleWorldChange = (next: WorldData) => {
+    setWorld(next);
+    scheduleWorldSave(next, (data) => {
       setSavedAt(data?.savedAt ?? null);
       setSaveFailed(data === null);
     });
@@ -72,8 +75,8 @@ export default function EditorApp() {
 
   const handlePlaytest = (idx: number) => {
     // Persist exactly the current state, then hand off to the game.
-    scheduleLevelsSave(levels);
-    flushLevelsSave();
+    scheduleWorldSave(world);
+    flushWorldSave();
     window.location.href = `index.html?play=${idx}`;
   };
 
@@ -114,7 +117,7 @@ export default function EditorApp() {
           </div>
         </header>
 
-        <LevelEditor levels={levels} onLevelsChange={handleLevelsChange} onPlaytest={handlePlaytest} language={language} />
+        <LevelEditor world={world} onWorldChange={handleWorldChange} onPlaytest={handlePlaytest} language={language} />
       </div>
     </div>
   );

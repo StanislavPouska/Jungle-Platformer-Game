@@ -5,8 +5,9 @@
 
 import React, { useEffect } from 'react';
 import { Lang, UI, UIStrings } from '../i18n';
+import { ChapterId } from '../types';
 
-export type ChapterId = 'prologue' | 'ch1' | 'ch2' | 'epilogue';
+export type { ChapterId };
 
 interface ChapterMeta {
   eyebrowKey?: keyof UIStrings;
@@ -44,9 +45,12 @@ interface ChapterCardProps {
   chapterId: ChapterId;
   language: Lang;
   onBegin: () => void;
+  // false renders the card filling its parent (e.g. as an in-canvas overlay)
+  // instead of claiming the whole viewport height.
+  fullScreen?: boolean;
 }
 
-export default function ChapterCard({ chapterId, language, onBegin }: ChapterCardProps) {
+export default function ChapterCard({ chapterId, language, onBegin, fullScreen = true }: ChapterCardProps) {
   const t = UI[language];
   const meta = META[chapterId];
 
@@ -64,7 +68,7 @@ export default function ChapterCard({ chapterId, language, onBegin }: ChapterCar
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-6 cursor-pointer select-none relative overflow-hidden"
+      className={`${fullScreen ? 'min-h-screen' : 'h-full w-full'} flex items-center justify-center p-6 cursor-pointer select-none relative overflow-hidden`}
       onClick={onBegin}
       id="chapter-card"
       data-chapter={chapterId}
