@@ -50,7 +50,8 @@ type Selection =
   | { kind: 'toad'; id: string }
   | { kind: 'collectible'; id: string }
   | { kind: 'start' }
-  | { kind: 'end' };
+  | { kind: 'end' }
+  | { kind: 'puzzle' };
 
 type PaletteItem =
   | { group: 'platform'; type: Platform['type'] }
@@ -78,11 +79,60 @@ interface LevelEditorProps {
 const snap = (v: number) => Math.round(v / GRID) * GRID;
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
+// Module scope on purpose: defining these inside LevelEditor would give them a
+// fresh component identity every render, so React would remount them on each
+// keystroke and the inputs would drop keyboard focus mid-typing.
+function NumberField({ label, value, onChange, step = 10 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) {
+  // Draft holds the raw text while the field is being edited so partial input
+  // (like a momentarily emptied field) isn't coerced to 0.
+  const [draft, setDraft] = useState<string | null>(null);
+  return (
+    <label className="flex flex-col gap-0.5">
+      <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400">{label}</span>
+      <input
+        type="number"
+        value={draft ?? String(value)}
+        step={step}
+        onChange={(e) => {
+          setDraft(e.target.value);
+          const v = Number(e.target.value);
+          if (e.target.value !== '' && Number.isFinite(v)) onChange(v);
+        }}
+        onBlur={() => setDraft(null)}
+        className="bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white focus:border-fuchsia-500 outline-none"
+      />
+    </label>
+  );
+}
+
+function PaletteButton({ item, label, color, icon, armed, onToggle }: { item: PaletteItem; label: string; color: string; icon: React.ReactNode; armed: boolean; onToggle: () => void }) {
+  return (
+    <button
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify(item));
+        e.dataTransfer.effectAllowed = 'copy';
+      }}
+      onClick={onToggle}
+      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left cursor-grab active:cursor-grabbing transition-all ${
+        armed
+          ? 'border-fuchsia-400 bg-fuchsia-950/50 ring-1 ring-fuchsia-400'
+          : 'border-purple-900/50 bg-[#0c0419] hover:bg-purple-950/40'
+      }`}
+      data-palette={`${item.group}${'type' in item ? '-' + item.type : ''}`}
+    >
+      <span className="w-4 h-4 rounded-sm flex items-center justify-center shrink-0" style={{ color }}>{icon}</span>
+      <span className="text-xs text-gray-200">{label}</span>
+    </button>
+  );
+}
+
 export default function LevelEditor({ levels, onLevelsChange, onPlaytest, language }: LevelEditorProps) {
   const t = UI[language];
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selected, setSelected] = useState<Selection | null>(null);
   const [armed, setArmed] = useState<PaletteItem | null>(null);
+  const [bgError, setBgError] = useState(false);
 
   const index = clamp(selectedIndex, 0, levels.length - 1);
   const level = levels[index];
@@ -98,6 +148,20 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
   const updateLevel = (mutator: (lvl: Level) => Level) => {
     const next = levels.slice();
     next[index] = mutator(level);
+    onLevelsChange(next);
+  };
+
+  // For async completions (e.g. image decode): resolve the target by id
+  // against the freshest level list, so edits made while the work was in
+  // flight aren't clobbered by a stale snapshot.
+  const levelsRef = useRef(levels);
+  levelsRef.current = levels;
+  const updateLevelById = (id: number, mutator: (lvl: Level) => Level) => {
+    const cur = levelsRef.current;
+    const i = cur.findIndex((l) => l.id === id);
+    if (i < 0) return;
+    const next = cur.slice();
+    next[i] = mutator(next[i]);
     onLevelsChange(next);
   };
 
@@ -123,6 +187,7 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
       return { x: c.x, y: c.y, w: 18, h: 18 };
     }
     if (sel.kind === 'start') return { x: level.startX, y: level.startY, w: 28, h: 48 };
+    if (sel.kind === 'puzzle') return { x: level.puzzle?.triggerX ?? 0, y: 0, w: 8, h: WORLD_H };
     return { x: level.endX, y: level.endY, w: 40, h: 40 };
   };
 
@@ -140,6 +205,9 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
         return { ...lvl, collectibles: lvl.collectibles.map((c) => (c.id === sel.id ? { ...c, x: nx, y: ny } : c)) };
       }
       if (sel.kind === 'start') return { ...lvl, startX: nx, startY: ny };
+      if (sel.kind === 'puzzle') {
+        return lvl.puzzle ? { ...lvl, puzzle: { ...lvl.puzzle, triggerX: nx } } : lvl;
+      }
       return { ...lvl, endX: nx, endY: ny };
     });
   };
@@ -251,6 +319,7 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
     setSelectedIndex(i);
     setSelected(null);
     setArmed(null);
+    setBgError(false);
   };
 
   const handleNewLevel = () => {
@@ -319,7 +388,16 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
           const cx = c.getContext('2d');
           if (!cx) return reject(new Error('no 2d context'));
           cx.drawImage(img, 0, 0, w, h);
-          resolve(c.toDataURL('image/jpeg', 0.82));
+          // Preserve transparency when the source has any — JPEG would
+          // flatten it to solid black. Sample every 16th pixel's alpha.
+          let hasAlpha = false;
+          try {
+            const px = cx.getImageData(0, 0, w, h).data;
+            for (let i = 3; i < px.length; i += 64) {
+              if (px[i] < 255) { hasAlpha = true; break; }
+            }
+          } catch { /* unreadable pixels — fall back to JPEG */ }
+          resolve(hasAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.82));
         };
         img.onerror = reject;
         img.src = reader.result as string;
@@ -330,27 +408,15 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
 
   const handleBgFile = async (file: File | undefined) => {
     if (!file) return;
+    const targetId = level.id; // the upload belongs to the level shown at pick time
+    setBgError(false);
     try {
       const dataUrl = await downscaleImage(file, 1280);
-      updateLevel((lvl) => ({ ...lvl, backgroundImage: dataUrl }));
+      updateLevelById(targetId, (lvl) => ({ ...lvl, backgroundImage: dataUrl }));
     } catch {
-      /* ignore decode failures */
+      setBgError(true);
     }
   };
-
-  // ---- small field helpers --------------------------------------------------
-  const NumberField = ({ label, value, onChange, step = 10 }: { label: string; value: number; onChange: (v: number) => void; step?: number }) => (
-    <label className="flex flex-col gap-0.5">
-      <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400">{label}</span>
-      <input
-        type="number"
-        value={value}
-        step={step}
-        onChange={(e) => onChange(Number(e.target.value))}
-        className="bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white focus:border-fuchsia-500 outline-none"
-      />
-    </label>
-  );
 
   const selPlatform = selected?.kind === 'platform' ? level.platforms.find((p) => p.id === selected.id) : undefined;
   const selToad = selected?.kind === 'toad' ? level.toads.find((td) => td.id === selected.id) : undefined;
@@ -370,26 +436,8 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
   ];
 
   const isArmed = (item: PaletteItem) => armed != null && JSON.stringify(armed) === JSON.stringify(item);
-
-  const PaletteButton = ({ item, label, color, icon }: { item: PaletteItem; label: string; color: string; icon: React.ReactNode }) => (
-    <button
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/plain', JSON.stringify(item));
-        e.dataTransfer.effectAllowed = 'copy';
-      }}
-      onClick={() => setArmed((prev) => (prev && JSON.stringify(prev) === JSON.stringify(item) ? null : item))}
-      className={`flex items-center gap-2 px-2.5 py-2 rounded-lg border text-left cursor-grab active:cursor-grabbing transition-all ${
-        isArmed(item)
-          ? 'border-fuchsia-400 bg-fuchsia-950/50 ring-1 ring-fuchsia-400'
-          : 'border-purple-900/50 bg-[#0c0419] hover:bg-purple-950/40'
-      }`}
-      data-palette={`${item.group}${'type' in item ? '-' + item.type : ''}`}
-    >
-      <span className="w-4 h-4 rounded-sm flex items-center justify-center shrink-0" style={{ color }}>{icon}</span>
-      <span className="text-xs text-gray-200">{label}</span>
-    </button>
-  );
+  const toggleArmed = (item: PaletteItem) =>
+    setArmed((prev) => (prev && JSON.stringify(prev) === JSON.stringify(item) ? null : item));
 
   const guideY = (worldY: number) => worldY * SCALE;
 
@@ -441,17 +489,17 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
             <div className="grid grid-cols-1 gap-1.5">
               {platformPalette.map((p) => (
                 <React.Fragment key={p.label}>
-                  <PaletteButton item={p.item} label={p.label} color={p.color} icon={<Box className="w-4 h-4" fill="currentColor" />} />
+                  <PaletteButton item={p.item} label={p.label} color={p.color} icon={<Box className="w-4 h-4" fill="currentColor" />} armed={isArmed(p.item)} onToggle={() => toggleArmed(p.item)} />
                 </React.Fragment>
               ))}
             </div>
             <div className="text-[10px] font-mono uppercase text-gray-500 pt-1">{t.editorGroupCreatures}</div>
-            <PaletteButton item={{ group: 'toad' }} label={t.palToad} color="#4ade80" icon={<Bug className="w-4 h-4" />} />
+            <PaletteButton item={{ group: 'toad' }} label={t.palToad} color="#4ade80" icon={<Bug className="w-4 h-4" />} armed={isArmed({ group: 'toad' })} onToggle={() => toggleArmed({ group: 'toad' })} />
             <div className="text-[10px] font-mono uppercase text-gray-500 pt-1">{t.editorGroupCollectibles}</div>
             <div className="grid grid-cols-1 gap-1.5">
               {collectiblePalette.map((c) => (
                 <React.Fragment key={c.label}>
-                  <PaletteButton item={c.item} label={c.label} color={c.color} icon={c.item.group === 'collectible' && c.item.type === 'star' ? <Star className="w-4 h-4" fill="currentColor" /> : <Cherry className="w-4 h-4" fill="currentColor" />} />
+                  <PaletteButton item={c.item} label={c.label} color={c.color} icon={c.item.group === 'collectible' && c.item.type === 'star' ? <Star className="w-4 h-4" fill="currentColor" /> : <Cherry className="w-4 h-4" fill="currentColor" />} armed={isArmed(c.item)} onToggle={() => toggleArmed(c.item)} />
                 </React.Fragment>
               ))}
             </div>
@@ -480,11 +528,11 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
               }}
               id="editor-canvas"
             >
-              {/* guide lines */}
-              <div className="absolute left-0 right-0 border-t border-dashed border-cyan-500/40" style={{ top: guideY(420) }}>
+              {/* guide lines (decoration only — must not eat placement clicks) */}
+              <div className="absolute left-0 right-0 border-t border-dashed border-cyan-500/40 pointer-events-none" style={{ top: guideY(420) }}>
                 <span className="absolute right-1 -top-3 text-[8px] font-mono text-cyan-500/70">{t.editorGuideScreen}</span>
               </div>
-              <div className="absolute left-0 right-0 border-t border-dashed border-rose-500/40" style={{ top: guideY(550) }}>
+              <div className="absolute left-0 right-0 border-t border-dashed border-rose-500/40 pointer-events-none" style={{ top: guideY(550) }}>
                 <span className="absolute right-1 -top-3 text-[8px] font-mono text-rose-500/70">{t.editorGuideFall}</span>
               </div>
 
@@ -564,6 +612,19 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
               >
                 <DoorOpen className="w-3.5 h-3.5 text-fuchsia-300" />
               </div>
+
+              {/* riddle-gate marker — the invisible quiz wall at puzzle.triggerX */}
+              {level.puzzle && (
+                <div
+                  onPointerDown={(e) => beginDrag(e, { kind: 'puzzle' }, 'move')}
+                  className={`absolute top-0 bottom-0 z-20 w-2 border-l-2 border-dashed border-amber-400/80 bg-amber-400/10 ${selected?.kind === 'puzzle' ? 'ring-2 ring-amber-300' : ''}`}
+                  style={{ left: level.puzzle.triggerX * SCALE - 1, cursor: 'ew-resize' }}
+                  data-item="puzzle"
+                  title={t.editorMarkerPuzzle}
+                >
+                  <span className="absolute top-1 -left-2.5 w-5 h-5 rounded-full bg-amber-400 text-black text-[11px] font-bold flex items-center justify-center select-none">?</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -667,6 +728,13 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
                 <NumberField label={t.editorFieldY} value={level.endY} onChange={(v) => moveItem(selected, level.endX, v)} />
               </div>
             )}
+            {selected?.kind === 'puzzle' && level.puzzle && (
+              <div className="space-y-2" id="inspector-puzzle">
+                <div className="text-[11px] font-bold text-amber-300">{t.editorMarkerPuzzle}</div>
+                <p className="text-[10px] text-amber-200/80 leading-snug">{t.editorPuzzleHint}</p>
+                <NumberField label={t.editorFieldX} value={level.puzzle.triggerX} onChange={(v) => moveItem(selected, v, 0)} />
+              </div>
+            )}
           </div>
 
           {/* Level settings */}
@@ -720,6 +788,9 @@ export default function LevelEditor({ levels, onLevelsChange, onPlaytest, langua
               <button onClick={() => fileInputRef.current?.click()} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-purple-900/40 hover:bg-purple-800/50 border border-purple-700/40 text-purple-200 text-[11px] cursor-pointer" id="editor-bg-upload">
                 <Upload className="w-3.5 h-3.5" />{t.editorBgCustom}
               </button>
+            )}
+            {bgError && (
+              <p className="text-[10px] text-rose-400" id="editor-bg-error">{t.editorBgUploadFailed}</p>
             )}
           </div>
         </aside>

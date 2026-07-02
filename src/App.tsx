@@ -31,7 +31,16 @@ import {
 } from 'lucide-react';
 import { audioSynth } from './audio';
 import { Lang, UI, getLevelText, getPrologueText, getEpilogueText } from './i18n';
-import { SAVE_KEY, LANG_KEY, SaveData, readSaveData, readSavedLang } from './storage';
+import {
+  LANG_KEY,
+  SaveData,
+  readSaveData,
+  readSavedLang,
+  mergeWithDefaults,
+  writeSaveData,
+  scheduleLevelsSave,
+  flushLevelsSave,
+} from './storage';
 
 // A navigable stage and the chapter it belongs to. Levels 1-4 (indices 0-3)
 // are Chapter 1; levels 5-10 (indices 4-9) are Chapter 2.
@@ -75,6 +84,9 @@ export default function App() {
   const t = UI[language];
   // Clamp in case the editor deleted the level the game was sitting on.
   const currentLevelData = levels[Math.min(stats.currentLevel, levels.length - 1)];
+  // Epilogue is always the stage after the highest level id (editor levels
+  // included) — hardcoding "11" would collide with a custom level 11.
+  const epilogueStageNum = String(levels.reduce((m, l) => Math.max(m, l.id), 0) + 1).padStart(2, '0');
   const currentLevelText = getLevelText(currentLevelData, language);
   const prologueText = getPrologueText(PROLOGUE_LEVEL, language);
   const epilogueText = getEpilogueText(EPILOGUE_FIGHT, language);
@@ -100,26 +112,32 @@ export default function App() {
   }, [stats.gameState]);
 
   // Standalone editor "Playtest" navigates here with ?play=N — load the levels
-  // the editor saved and jump straight into level N, then strip the param.
+  // the editor saved (merged against the built-in set, same as Load) and jump
+  // straight into level N via the shared launch path, then strip the param.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const playRaw = params.get('play');
     if (playRaw === null) return;
     const saved = readSaveData();
-    const sourceLevels = saved?.levels?.length ? saved.levels : INITIAL_LEVELS;
-    if (saved?.levels?.length) setLevels(saved.levels);
+    const sourceLevels = saved?.levels?.length
+      ? mergeWithDefaults(saved.levels, saved.knownDefaultIds)
+      : levels;
+    if (saved?.levels?.length) setLevels(sourceLevels);
     const idx = parseInt(playRaw, 10);
     const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.min(idx, sourceLevels.length - 1)) : 0;
-    setShowPrologue(false);
-    setShowEpilogue(false);
-    setChapterCard(null);
-    setPendingStage(null);
-    setActiveChapter(chapterOf({ kind: 'level', index: safeIdx }));
     setActiveTab('game');
-    setStats((prev) => ({ ...prev, currentLevel: safeIdx, gameState: 'playing' }));
+    launchStage({ kind: 'level', index: safeIdx });
     params.delete('play');
     const qs = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+  }, []);
+
+  // Editor autosaves are debounced — force any pending write out before the
+  // page goes away so the last few edits aren't lost.
+  useEffect(() => {
+    const flush = () => flushLevelsSave();
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
   }, []);
 
   // Launch a stage immediately (no chapter card).
@@ -159,12 +177,15 @@ export default function App() {
     if (pendingStage) launchStage(pendingStage);
   };
 
-  // Advance level — after the final level, flow into the Epilogue fight
+  // Advance level — after the final level, flow into the Epilogue fight.
+  // Clamp first: deleting levels in the editor can leave currentLevel past
+  // the end, which would otherwise make the equality check unreachable.
   const handleNextLevel = () => {
-    if (stats.currentLevel === levels.length - 1) {
+    const cur = Math.min(stats.currentLevel, levels.length - 1);
+    if (cur === levels.length - 1) {
       requestStage({ kind: 'epilogue' });
     } else {
-      requestStage({ kind: 'level', index: stats.currentLevel + 1 });
+      requestStage({ kind: 'level', index: cur + 1 });
     }
   };
 
@@ -175,8 +196,22 @@ export default function App() {
 
   // Playtest a level from the in-app editor tab — jump straight into it.
   const handlePlaytestLevel = (idx: number) => {
+    flushLevelsSave(); // persist any pending editor autosave before playing
     setActiveTab('game');
     launchStage({ kind: 'level', index: idx });
+  };
+
+  // In-app editor writes: update state, keep the running stage index valid if
+  // levels were deleted, and autosave (debounced) so editor work survives a
+  // refresh — mirroring the standalone editor's behavior.
+  const handleEditorLevelsChange = (next: Level[]) => {
+    setLevels(next);
+    setStats((prev) =>
+      prev.currentLevel >= next.length ? { ...prev, currentLevel: next.length - 1 } : prev,
+    );
+    scheduleLevelsSave(next, (data) => {
+      if (data) setSaveData(data);
+    });
   };
 
   // Reload current stage
@@ -200,7 +235,8 @@ export default function App() {
     }
   };
 
-  // Hard Reset
+  // Hard Reset — resets run progress only. Level designs are the player's
+  // work (editor); restoring the built-in set is an explicit editor action.
   const handleResetProgress = () => {
     setStats((prev) => ({
       score: 0,
@@ -210,7 +246,6 @@ export default function App() {
       currentLevel: 0,
       gameState: prev.gameState === 'start_screen' ? 'start_screen' : 'playing'
     }));
-    setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
     setShowPrologue(false);
     setShowEpilogue(false);
     setChapterCard(null);
@@ -219,9 +254,10 @@ export default function App() {
     audioSynth.playJump();
   };
 
-  // Start a brand new run from the menu — opens with the Prologue chapter card
+  // Start a brand new run from the menu — opens with the Prologue chapter
+  // card. Deliberately leaves the level designs alone: resetting them here
+  // would wipe editor work (and a following Save would make that permanent).
   const handleNewGame = () => {
-    setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
     setStats({
       score: 0,
       bananasCollected: 0,
@@ -263,31 +299,35 @@ export default function App() {
     setStats((prev) => ({ ...prev, gameState: 'start_screen' }));
   };
 
-  // Persist current run to localStorage
+  // Persist current run to localStorage (stamps knownDefaultIds so future
+  // merges can tell "new built-in level" apart from "deliberately deleted")
   const handleSaveGame = () => {
-    const data: SaveData = {
+    const data = writeSaveData({
       stats,
       settings,
       levels,
       savedAt: new Date().toLocaleString()
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    setSaveData(data);
+    });
+    if (data) setSaveData(data);
   };
 
-  // Restore a previously saved run — resume directly, no chapter card
+  // Restore a previously saved run — resume directly, no chapter card.
+  // Levels are merged against the built-in set so an old/partial save never
+  // hides levels (the same recovery the standalone editor does).
   const handleLoadGame = () => {
     const data = readSaveData();
     if (!data) return;
-    setLevels(data.levels);
+    const mergedLevels = mergeWithDefaults(data.levels, data.knownDefaultIds);
+    const safeLevel = Math.min(data.stats.currentLevel, mergedLevels.length - 1);
+    setLevels(mergedLevels);
     setSettings(data.settings);
-    setStats({ ...data.stats, gameState: 'playing' });
+    setStats({ ...data.stats, currentLevel: safeLevel, gameState: 'playing' });
     setSaveData(data);
     setShowPrologue(false);
     setShowEpilogue(false);
     setChapterCard(null);
     setPendingStage(null);
-    setActiveChapter(chapterOf({ kind: 'level', index: data.stats.currentLevel }));
+    setActiveChapter(chapterOf({ kind: 'level', index: safeLevel }));
     setMenuOpen(false);
   };
 
@@ -448,7 +488,7 @@ export default function App() {
         {activeTab === 'editor' ? (
           <LevelEditor
             levels={levels}
-            onLevelsChange={setLevels}
+            onLevelsChange={handleEditorLevelsChange}
             onPlaytest={handlePlaytestLevel}
             language={language}
           />
@@ -526,7 +566,7 @@ export default function App() {
                     id="btn-select-epilogue"
                   >
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-mono tracking-widest text-rose-400 font-bold">{t.stage} 11</span>
+                      <span className="text-[10px] font-mono tracking-widest text-rose-400 font-bold">{t.stage} {epilogueStageNum}</span>
                       {showEpilogue && <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />}
                     </div>
                     <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
@@ -569,7 +609,7 @@ export default function App() {
               {showEpilogue ? (
                 <div className="bg-gradient-to-r from-[#2a0d0d]/55 to-[#1a0808]/40 px-5 py-4 rounded-2xl border-2 border-rose-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="epilogue-alert-banner">
                   <div className="absolute right-0 top-0 text-[100px] text-rose-950/25 font-sans font-black pointer-events-none select-none leading-none">
-                    11
+                    {epilogueStageNum}
                   </div>
                   <Swords className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
                   <div className="space-y-1">

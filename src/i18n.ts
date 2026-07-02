@@ -4,6 +4,7 @@
  */
 
 import { Level, PuzzleGate, PrologueLevel, FightConfig } from './types';
+import { INITIAL_LEVELS } from './data';
 
 export type Lang = 'en' | 'cs';
 
@@ -216,6 +217,10 @@ export const UI = {
     editorConfirmDelete: 'Delete this level?',
     editorReset: 'Reset to defaults',
     editorConfirmReset: 'Replace all levels with the original built-in set? Your level edits will be lost.',
+    editorMarkerPuzzle: 'Riddle Gate',
+    editorPuzzleHint: 'Invisible quiz wall — the player must answer the riddle here to pass.',
+    editorBgUploadFailed: 'Image could not be loaded.',
+    editorSaveFailed: 'Autosave failed — browser storage may be full.',
   },
   cs: {
     brandTag1: '2D BOČNÍ POHLED',
@@ -420,6 +425,10 @@ export const UI = {
     editorConfirmDelete: 'Smazat tuto úroveň?',
     editorReset: 'Obnovit výchozí',
     editorConfirmReset: 'Nahradit všechny úrovně původní vestavěnou sadou? Vaše úpravy úrovní budou ztraceny.',
+    editorMarkerPuzzle: 'Hádanková Brána',
+    editorPuzzleHint: 'Neviditelná kvízová zeď — hráč zde musí zodpovědět hádanku, aby prošel.',
+    editorBgUploadFailed: 'Obrázek se nepodařilo načíst.',
+    editorSaveFailed: 'Automatické uložení selhalo — úložiště prohlížeče může být plné.',
   },
 };
 
@@ -477,7 +486,13 @@ const LEVEL_TEXT_CS: Record<number, LevelText> = {
 
 export function getLevelText(level: Level, lang: Lang): LevelText {
   if (lang === 'cs' && LEVEL_TEXT_CS[level.id]) {
-    return LEVEL_TEXT_CS[level.id];
+    // Only apply the canned Czech translation while the level still carries
+    // its pristine built-in text — once the user renames or re-describes a
+    // level in the editor, their words win in every language.
+    const def = INITIAL_LEVELS.find((d) => d.id === level.id);
+    if (def && def.name === level.name && def.description === level.description) {
+      return LEVEL_TEXT_CS[level.id];
+    }
   }
   return { name: level.name, description: level.description };
 }

@@ -8,22 +8,24 @@ import { Level } from './types';
 import { INITIAL_LEVELS } from './data';
 import LevelEditor from './components/LevelEditor';
 import { Lang, UI, LANGUAGES } from './i18n';
-import { readSaveData, writeLevelsToSave, readSavedLang, LANG_KEY } from './storage';
+import {
+  readSaveData,
+  writeLevelsToSave,
+  scheduleLevelsSave,
+  flushLevelsSave,
+  mergeWithDefaults,
+  readSavedLang,
+  LANG_KEY,
+} from './storage';
 import { SquarePen } from 'lucide-react';
 
-// Merge any saved levels with the full built-in set, keyed by id, so an old or
-// partial save (e.g. from before the game grew to 10 levels) never hides
-// levels in the editor. Saved edits win where ids match; custom levels (ids not
-// in the defaults) are kept and appended.
+// Seed the editor's level list from the shared save, merged against the
+// built-in set: recovers levels an old/partial save is missing while keeping
+// the user's deliberate deletions deleted (knownDefaultIds tells them apart).
 function seedLevels(): Level[] {
-  const saved = readSaveData()?.levels ?? [];
-  if (!saved.length) return JSON.parse(JSON.stringify(INITIAL_LEVELS));
-  const byId = new Map(saved.map((l) => [l.id, l]));
-  const merged: Level[] = INITIAL_LEVELS.map((def) => byId.get(def.id) ?? def);
-  for (const l of saved) {
-    if (!INITIAL_LEVELS.some((d) => d.id === l.id)) merged.push(l);
-  }
-  return JSON.parse(JSON.stringify(merged));
+  const saved = readSaveData();
+  if (!saved?.levels?.length) return JSON.parse(JSON.stringify(INITIAL_LEVELS));
+  return mergeWithDefaults(saved.levels, saved.knownDefaultIds);
 }
 
 // Standalone host for the level editor — what editor.exe opens. Shares the
@@ -33,22 +35,30 @@ export default function EditorApp() {
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
   const [levels, setLevels] = useState<Level[]>(seedLevels);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const t = UI[language];
 
-  // If the seed recovered levels a stale/partial save was missing, persist the
-  // upgraded set so the game's Load and future opens stay consistent.
+  // Re-stamp the save on mount: persists any levels the merge recovered and
+  // records knownDefaultIds so future deletions of built-ins stay durable.
   useEffect(() => {
-    const savedCount = readSaveData()?.levels?.length ?? 0;
-    if (savedCount > 0 && savedCount < levels.length) {
-      writeLevelsToSave(levels);
-    }
+    if (readSaveData()) writeLevelsToSave(levels);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosaves are debounced — push any pending write out before the page
+  // closes so the last edits aren't lost.
+  useEffect(() => {
+    const flush = () => flushLevelsSave();
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
   }, []);
 
   const handleLevelsChange = (next: Level[]) => {
     setLevels(next);
-    const data = writeLevelsToSave(next);
-    setSavedAt(data?.savedAt ?? null);
+    scheduleLevelsSave(next, (data) => {
+      setSavedAt(data?.savedAt ?? null);
+      setSaveFailed(data === null);
+    });
   };
 
   const handleLanguageChange = (lang: Lang) => {
@@ -61,7 +71,9 @@ export default function EditorApp() {
   };
 
   const handlePlaytest = (idx: number) => {
-    writeLevelsToSave(levels); // make sure the latest edits are persisted
+    // Persist exactly the current state, then hand off to the game.
+    scheduleLevelsSave(levels);
+    flushLevelsSave();
     window.location.href = `index.html?play=${idx}`;
   };
 
@@ -79,7 +91,11 @@ export default function EditorApp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {savedAt && <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorAutosaved}</span>}
+            {saveFailed ? (
+              <span className="text-[10px] font-mono text-rose-400" id="editor-save-error">⚠ {t.editorSaveFailed}</span>
+            ) : savedAt ? (
+              <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorAutosaved}</span>
+            ) : null}
             <div className="flex gap-1 bg-[#0d071f] p-1 rounded-xl border border-purple-900/40">
               {LANGUAGES.map((l) => (
                 <button

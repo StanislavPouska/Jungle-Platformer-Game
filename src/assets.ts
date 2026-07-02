@@ -36,7 +36,10 @@ const cache: Record<string, HTMLImageElement> = {};
 let started = false;
 
 // Separate cache for level-editor custom backgrounds supplied as data URLs.
-const dataUrlCache: Record<string, HTMLImageElement> = {};
+// Bounded: superseded uploads would otherwise pile up as decoded images for
+// the life of the page. Map iteration order gives us oldest-first eviction.
+const dataUrlCache = new Map<string, HTMLImageElement>();
+const DATA_URL_CACHE_MAX = 8;
 
 /** Kick off loading of every asset. Safe to call repeatedly. */
 export function preloadAssets(): void {
@@ -64,14 +67,21 @@ export function getImage(name: string): HTMLImageElement | null {
  */
 export function getImageFromDataUrl(url: string): HTMLImageElement | null {
   if (!url || typeof window === 'undefined') return null;
-  let img = dataUrlCache[url];
+  let img = dataUrlCache.get(url);
   if (!img) {
     img = new Image();
     img.decoding = 'async';
     img.src = url;
-    dataUrlCache[url] = img;
+    dataUrlCache.set(url, img);
+    while (dataUrlCache.size > DATA_URL_CACHE_MAX) {
+      const oldest = dataUrlCache.keys().next().value as string;
+      dataUrlCache.delete(oldest);
+    }
     return null;
   }
+  // Refresh recency so the active level's backdrop never gets evicted.
+  dataUrlCache.delete(url);
+  dataUrlCache.set(url, img);
   if (img.complete && img.naturalWidth > 0) return img;
   return null;
 }
