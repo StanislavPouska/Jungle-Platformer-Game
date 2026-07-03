@@ -4,16 +4,13 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { INITIAL_LEVELS, INITIAL_SETTINGS } from './data';
-import { GameStats, GameSettings, Level } from './types';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SETTINGS } from './data';
+import { GameStats, GameSettings, WorldData, ChapterId } from './types';
 import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
-import PrologueCanvas from './components/PrologueCanvas';
-import FighterCanvas from './components/FighterCanvas';
+import StealthCanvas from './components/StealthCanvas';
 import LevelEditor from './components/LevelEditor';
-import ChapterCard, { ChapterId } from './components/ChapterCard';
-import { PROLOGUE_LEVEL } from './prologueData';
-import { EPILOGUE_FIGHT } from './fighterData';
+import ChapterCard from './components/ChapterCard';
 import {
   Trees,
   HelpCircle,
@@ -26,28 +23,26 @@ import {
   Info,
   Menu as MenuIcon,
   Skull,
-  Swords,
   SquarePen
 } from 'lucide-react';
 import { audioSynth } from './audio';
-import { Lang, UI, getLevelText, getPrologueText, getEpilogueText } from './i18n';
-import { SAVE_KEY, LANG_KEY, SaveData, readSaveData, readSavedLang } from './storage';
+import { Lang, UI, getMissionText } from './i18n';
+import {
+  LANG_KEY,
+  SaveData,
+  readSaveData,
+  readSavedLang,
+  mergeWithDefaults,
+  writeSaveData,
+  scheduleWorldSave,
+  flushWorldSave,
+} from './storage';
 
-// A navigable stage and the chapter it belongs to. Levels 1-4 (indices 0-3)
-// are Chapter 1; levels 5-10 (indices 4-9) are Chapter 2.
-type StageRef =
-  | { kind: 'prologue' }
-  | { kind: 'level'; index: number }
-  | { kind: 'epilogue' };
-
-function chapterOf(stage: StageRef): ChapterId {
-  if (stage.kind === 'prologue') return 'prologue';
-  if (stage.kind === 'epilogue') return 'epilogue';
-  return stage.index <= 3 ? 'ch1' : 'ch2';
-}
+const initialWorld = (): WorldData =>
+  JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }));
 
 export default function App() {
-  const [levels, setLevels] = useState(INITIAL_LEVELS);
+  const [world, setWorld] = useState<WorldData>(initialWorld);
   const [settings, setSettings] = useState<GameSettings>(INITIAL_SETTINGS);
 
   const [stats, setStats] = useState<GameStats>({
@@ -64,20 +59,18 @@ export default function App() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveData, setSaveData] = useState<SaveData | null>(() => readSaveData());
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
-  const [showPrologue, setShowPrologue] = useState(false);
-  const [showEpilogue, setShowEpilogue] = useState(false);
   // Chapter title cards: which chapter the player is currently in, plus a
-  // pending card to show (with the stage to launch once the player begins).
+  // pending card to show (with the mission index to launch once they begin).
   const [activeChapter, setActiveChapter] = useState<ChapterId | null>(null);
   const [chapterCard, setChapterCard] = useState<ChapterId | null>(null);
-  const [pendingStage, setPendingStage] = useState<StageRef | null>(null);
+  const [pendingStage, setPendingStage] = useState<number | null>(null);
 
   const t = UI[language];
-  // Clamp in case the editor deleted the level the game was sitting on.
-  const currentLevelData = levels[Math.min(stats.currentLevel, levels.length - 1)];
-  const currentLevelText = getLevelText(currentLevelData, language);
-  const prologueText = getPrologueText(PROLOGUE_LEVEL, language);
-  const epilogueText = getEpilogueText(EPILOGUE_FIGHT, language);
+  const missions = world.missions;
+  // Clamp in case the editor deleted the mission the game was sitting on.
+  const currentIndex = Math.min(stats.currentLevel, missions.length - 1);
+  const currentMission = missions[currentIndex];
+  const currentMissionText = getMissionText(currentMission, language);
 
   const handleLanguageChange = (lang: Lang) => {
     setLanguage(lang);
@@ -99,87 +92,102 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [stats.gameState]);
 
-  // Standalone editor "Playtest" navigates here with ?play=N — load the levels
-  // the editor saved and jump straight into level N, then strip the param.
+  // Standalone editor "Playtest" navigates here with ?play=N — load the world
+  // the editor saved (merged against the built-in set, same as Load) and jump
+  // straight into mission N via the shared launch path, then strip the param.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const playRaw = params.get('play');
     if (playRaw === null) return;
     const saved = readSaveData();
-    const sourceLevels = saved?.levels?.length ? saved.levels : INITIAL_LEVELS;
-    if (saved?.levels?.length) setLevels(saved.levels);
+    const sourceWorld = saved?.world?.missions?.length
+      ? mergeWithDefaults(saved.world, saved.knownDefaults)
+      : world;
+    if (saved?.world?.missions?.length) setWorld(sourceWorld);
     const idx = parseInt(playRaw, 10);
-    const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.min(idx, sourceLevels.length - 1)) : 0;
-    setShowPrologue(false);
-    setShowEpilogue(false);
-    setChapterCard(null);
-    setPendingStage(null);
-    setActiveChapter(chapterOf({ kind: 'level', index: safeIdx }));
+    const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.min(idx, sourceWorld.missions.length - 1)) : 0;
     setActiveTab('game');
-    setStats((prev) => ({ ...prev, currentLevel: safeIdx, gameState: 'playing' }));
+    launchStage(safeIdx, sourceWorld);
     params.delete('play');
     const qs = params.toString();
     window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
   }, []);
 
-  // Launch a stage immediately (no chapter card).
-  const launchStage = (stage: StageRef) => {
+  // Editor autosaves are debounced — force any pending write out before the
+  // page goes away so the last few edits aren't lost.
+  useEffect(() => {
+    const flush = () => flushWorldSave();
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, []);
+
+  // Launch a mission immediately (no chapter card).
+  const launchStage = (index: number, inWorld: WorldData = world) => {
     setMenuOpen(false);
     setChapterCard(null);
     setPendingStage(null);
-    setActiveChapter(chapterOf(stage));
-    if (stage.kind === 'prologue') {
-      setShowPrologue(true);
-      setShowEpilogue(false);
-      setStats((prev) => ({ ...prev, gameState: 'playing' }));
-    } else if (stage.kind === 'epilogue') {
-      setShowEpilogue(true);
-      setShowPrologue(false);
-      setStats((prev) => ({ ...prev, gameState: 'playing' }));
-    } else {
-      setShowPrologue(false);
-      setShowEpilogue(false);
-      setStats((prev) => ({ ...prev, currentLevel: stage.index, gameState: 'playing' }));
-    }
+    setActiveChapter(inWorld.missions[index]?.chapter ?? null);
+    setStats((prev) => ({ ...prev, currentLevel: index, gameState: 'playing' }));
   };
 
-  // Navigate to a stage. Crossing into a new chapter first shows its title
-  // card; navigating within the current chapter launches the stage directly.
-  const requestStage = (stage: StageRef, forceCard = false) => {
-    if (forceCard || chapterOf(stage) !== activeChapter) {
-      setPendingStage(stage);
-      setChapterCard(chapterOf(stage));
+  // Navigate to a mission. Crossing into a new chapter first shows its title
+  // card; navigating within the current chapter launches the mission directly.
+  const requestStage = (index: number, forceCard = false) => {
+    const chapter = missions[index]?.chapter ?? null;
+    if (chapter && (forceCard || chapter !== activeChapter)) {
+      setPendingStage(index);
+      setChapterCard(chapter);
     } else {
-      launchStage(stage);
+      launchStage(index);
     }
   };
 
   // Begin the pending chapter from its title card.
   const handleBeginChapter = () => {
-    if (pendingStage) launchStage(pendingStage);
+    if (pendingStage !== null) launchStage(pendingStage);
   };
 
-  // Advance level — after the final level, flow into the Epilogue fight
+  // Advance mission — after the final mission the story is complete: back to
+  // the main menu (the finale fight lives inside the last mission as a trigger).
   const handleNextLevel = () => {
-    if (stats.currentLevel === levels.length - 1) {
-      requestStage({ kind: 'epilogue' });
+    const cur = Math.min(stats.currentLevel, missions.length - 1);
+    if (cur === missions.length - 1) {
+      setChapterCard(null);
+      setPendingStage(null);
+      setActiveChapter(null);
+      setMenuOpen(false);
+      setStats((prev) => ({ ...prev, gameState: 'start_screen' }));
     } else {
-      requestStage({ kind: 'level', index: stats.currentLevel + 1 });
+      requestStage(cur + 1);
     }
   };
 
-  // Skip or change level directly from the sidebar
-  const handleSelectLevel = (idx: number) => {
-    requestStage({ kind: 'level', index: idx });
+  // Skip or change mission directly from the sidebar
+  const handleSelectMission = (idx: number) => {
+    requestStage(idx);
   };
 
-  // Playtest a level from the in-app editor tab — jump straight into it.
+  // Playtest a mission from the in-app editor tab — jump straight into it.
   const handlePlaytestLevel = (idx: number) => {
+    flushWorldSave(); // persist any pending editor autosave before playing
     setActiveTab('game');
-    launchStage({ kind: 'level', index: idx });
+    launchStage(idx);
   };
 
-  // Reload current stage
+  // In-app editor writes: update state, keep the running mission index valid
+  // if missions were deleted, and autosave (debounced) so editor work survives
+  // a refresh — mirroring the standalone editor's behavior.
+  const handleEditorWorldChange = (next: WorldData) => {
+    setWorld(next);
+    setStats((prev) =>
+      prev.currentLevel >= next.missions.length ? { ...prev, currentLevel: next.missions.length - 1 } : prev,
+    );
+    scheduleWorldSave(next, (data) => {
+      if (data) setSaveData(data);
+    });
+  };
+
+  // Reload current mission
   const handleRestartLevel = () => {
     setStats((prev) => ({
       ...prev,
@@ -200,7 +208,8 @@ export default function App() {
     }
   };
 
-  // Hard Reset
+  // Hard Reset — resets run progress only. The world (missions/fights/quizzes)
+  // is the player's work (editor); restoring built-ins is an explicit editor action.
   const handleResetProgress = () => {
     setStats((prev) => ({
       score: 0,
@@ -210,18 +219,16 @@ export default function App() {
       currentLevel: 0,
       gameState: prev.gameState === 'start_screen' ? 'start_screen' : 'playing'
     }));
-    setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
-    setShowPrologue(false);
-    setShowEpilogue(false);
     setChapterCard(null);
     setPendingStage(null);
-    setActiveChapter('ch1');
+    setActiveChapter(missions[0]?.chapter ?? null);
     audioSynth.playJump();
   };
 
-  // Start a brand new run from the menu — opens with the Prologue chapter card
+  // Start a brand new run from the menu — opens with the first mission's
+  // chapter card. Deliberately leaves the world alone: resetting it here
+  // would wipe editor work (and a following Save would make that permanent).
   const handleNewGame = () => {
-    setLevels(JSON.parse(JSON.stringify(INITIAL_LEVELS)));
     setStats({
       score: 0,
       bananasCollected: 0,
@@ -230,64 +237,39 @@ export default function App() {
       currentLevel: 0,
       gameState: 'playing'
     });
-    setShowPrologue(false);
-    setShowEpilogue(false);
     setActiveChapter(null);
     setMenuOpen(false);
-    setPendingStage({ kind: 'prologue' });
-    setChapterCard('prologue');
+    setPendingStage(0);
+    setChapterCard(missions[0]?.chapter ?? 'ch1');
   };
 
-  // Jump straight to the prologue from the level selector
-  const handleSelectPrologue = () => {
-    requestStage({ kind: 'prologue' });
-  };
-
-  // Prologue's escape sequence finished — advance into Chapter 1
-  const handlePrologueComplete = () => {
-    requestStage({ kind: 'level', index: 0 });
-  };
-
-  // Jump straight to the Epilogue fight from the level selector
-  const handleSelectEpilogue = () => {
-    requestStage({ kind: 'epilogue' });
-  };
-
-  // Epilogue won — story complete, return to the main menu
-  const handleEpilogueComplete = () => {
-    setShowEpilogue(false);
-    setChapterCard(null);
-    setPendingStage(null);
-    setActiveChapter(null);
-    setMenuOpen(false);
-    setStats((prev) => ({ ...prev, gameState: 'start_screen' }));
-  };
-
-  // Persist current run to localStorage
+  // Persist current run to localStorage (stamps knownDefaults so future
+  // merges can tell "new built-in content" apart from "deliberately deleted")
   const handleSaveGame = () => {
-    const data: SaveData = {
+    const data = writeSaveData({
       stats,
       settings,
-      levels,
+      world,
       savedAt: new Date().toLocaleString()
-    };
-    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
-    setSaveData(data);
+    });
+    if (data) setSaveData(data);
   };
 
-  // Restore a previously saved run — resume directly, no chapter card
+  // Restore a previously saved run — resume directly, no chapter card.
+  // The world is merged against the built-in set so an old/partial save never
+  // hides content (the same recovery the standalone editor does).
   const handleLoadGame = () => {
     const data = readSaveData();
     if (!data) return;
-    setLevels(data.levels);
+    const mergedWorld = mergeWithDefaults(data.world, data.knownDefaults);
+    const safeLevel = Math.min(data.stats.currentLevel, mergedWorld.missions.length - 1);
+    setWorld(mergedWorld);
     setSettings(data.settings);
-    setStats({ ...data.stats, gameState: 'playing' });
+    setStats({ ...data.stats, currentLevel: safeLevel, gameState: 'playing' });
     setSaveData(data);
-    setShowPrologue(false);
-    setShowEpilogue(false);
     setChapterCard(null);
     setPendingStage(null);
-    setActiveChapter(chapterOf({ kind: 'level', index: data.stats.currentLevel }));
+    setActiveChapter(mergedWorld.missions[safeLevel]?.chapter ?? null);
     setMenuOpen(false);
   };
 
@@ -319,7 +301,7 @@ export default function App() {
     );
   }
 
-  // Chapter title card — shown between chapters before the stage loads
+  // Chapter title card — shown between chapters before the mission loads
   if (chapterCard) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 font-sans">
@@ -327,6 +309,8 @@ export default function App() {
       </div>
     );
   }
+
+  const isStealth = currentMission.type === 'stealth';
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 flex flex-col font-sans relative pb-10 select-none">
@@ -447,15 +431,15 @@ export default function App() {
         {/* Main Body */}
         {activeTab === 'editor' ? (
           <LevelEditor
-            levels={levels}
-            onLevelsChange={setLevels}
+            world={world}
+            onWorldChange={handleEditorWorldChange}
             onPlaytest={handlePlaytestLevel}
             language={language}
           />
         ) : activeTab === 'game' ? (
           <div className="flex flex-col xl:flex-row gap-6 items-start justify-center">
 
-            {/* Left sidebar - Levels List Selector */}
+            {/* Left sidebar - Mission List Selector */}
             <aside className="w-full xl:w-[300px] xl:shrink-0 space-y-4" id="lvl-selector-aside">
               <div className="bg-[#180a2d]/80 rounded-2xl p-4 border-2 border-fuchsia-500/25 shadow-xl shadow-fuchsia-950/20 space-y-3">
                 <h2 className="text-xs font-mono font-bold tracking-wider uppercase text-fuchsia-400 flex items-center gap-1.5">
@@ -464,79 +448,45 @@ export default function App() {
                 </h2>
 
                 <div className="space-y-3 pt-1">
-                  <button
-                    onClick={handleSelectPrologue}
-                    className={`w-full text-left p-3 rounded-xl border-2 transition-all block cursor-pointer ${
-                      showPrologue
-                      ? 'bg-[#2a1408]/70 border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.3)] transform scale-[1.02]'
-                      : 'bg-[#0d071f]/50 hover:bg-[#200d3d]/40 border-transparent text-gray-300'
-                    }`}
-                    id="btn-select-prologue"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-mono tracking-widest text-orange-400 font-bold">{t.stage} 00</span>
-                      {showPrologue && <span className="w-2 h-2 rounded-full bg-orange-400 animate-ping" />}
-                    </div>
-                    <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
-                      <Skull className="w-3.5 h-3.5 text-orange-300" />
-                      {prologueText.name}
-                    </h3>
-                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-tight">
-                      {prologueText.description}
-                    </p>
-                  </button>
-
-                  {levels.map((lvl, index) => {
-                    const isActive = !showPrologue && !showEpilogue && stats.currentLevel === index;
-                    const lvlText = getLevelText(lvl, language);
+                  {missions.map((m, index) => {
+                    const isActive = currentIndex === index;
+                    const mText = getMissionText(m, language);
+                    const stealth = m.type === 'stealth';
                     return (
                       <button
-                        key={lvl.id}
-                        onClick={() => handleSelectLevel(index)}
+                        key={m.id}
+                        onClick={() => handleSelectMission(index)}
                         className={`w-full text-left p-3 rounded-xl border-2 transition-all block cursor-pointer ${
                           isActive
-                          ? 'bg-[#29134a]/65 border-fuchsia-500/80 shadow-[0_0_15px_rgba(236,72,153,0.3)] transform scale-[1.02]'
+                          ? stealth
+                            ? 'bg-[#2a1408]/70 border-orange-500/80 shadow-[0_0_15px_rgba(249,115,22,0.3)] transform scale-[1.02]'
+                            : 'bg-[#29134a]/65 border-fuchsia-500/80 shadow-[0_0_15px_rgba(236,72,153,0.3)] transform scale-[1.02]'
                           : 'bg-[#0d071f]/50 hover:bg-[#200d3d]/40 border-transparent text-gray-300'
                         }`}
-                        id={`btn-select-level-${lvl.id}`}
+                        id={`btn-select-level-${m.id}`}
                       >
                         <div className="flex justify-between items-center">
-                          <span className="text-[10px] font-mono tracking-widest text-pink-400 font-bold">{t.stage} {String(lvl.id).padStart(2, '0')}</span>
-                          {isActive && <span className="w-2 h-2 rounded-full bg-fuchsia-400 animate-ping" />}
+                          <span className={`text-[10px] font-mono tracking-widest font-bold ${stealth ? 'text-orange-400' : 'text-pink-400'}`}>
+                            {t.stage} {String(m.id).padStart(2, '0')}
+                          </span>
+                          {isActive && <span className={`w-2 h-2 rounded-full animate-ping ${stealth ? 'bg-orange-400' : 'bg-fuchsia-400'}`} />}
                         </div>
-                        <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5">{lvlText.name}</h3>
+                        <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
+                          {stealth && <Skull className="w-3.5 h-3.5 text-orange-300" />}
+                          {mText.name}
+                        </h3>
                         <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-tight">
-                          {lvlText.description}
+                          {mText.description}
                         </p>
-                        <div className="flex justify-between items-center text-[10px] text-cyan-400 font-mono mt-2 pt-2 border-t border-purple-900/40">
-                          <span>{t.items}: {lvl.collectibles.length} {t.pcs}</span>
-                          <span>{t.start}: {lvl.startX}x</span>
-                        </div>
+                        {m.type === 'platformer' && (
+                          <div className="flex justify-between items-center text-[10px] text-cyan-400 font-mono mt-2 pt-2 border-t border-purple-900/40">
+                            <span>{t.items}: {m.collectibles.length} {t.pcs}</span>
+                            <span>{t.start}: {m.startX}x</span>
+                          </div>
+                        )}
                       </button>
                     );
                   })}
-
-                  <button
-                    onClick={handleSelectEpilogue}
-                    className={`w-full text-left p-3 rounded-xl border-2 transition-all block cursor-pointer ${
-                      showEpilogue
-                      ? 'bg-[#2a0d0d]/70 border-rose-500/80 shadow-[0_0_15px_rgba(244,63,94,0.3)] transform scale-[1.02]'
-                      : 'bg-[#0d071f]/50 hover:bg-[#200d3d]/40 border-transparent text-gray-300'
-                    }`}
-                    id="btn-select-epilogue"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-mono tracking-widest text-rose-400 font-bold">{t.stage} 11</span>
-                      {showEpilogue && <span className="w-2 h-2 rounded-full bg-rose-400 animate-ping" />}
-                    </div>
-                    <h3 className="font-sans font-bold text-sm tracking-tight text-white mt-0.5 flex items-center gap-1.5">
-                      <Swords className="w-3.5 h-3.5 text-rose-300" />
-                      {epilogueText.name}
-                    </h3>
-                    <p className="text-[11px] text-gray-400 mt-1 line-clamp-2 leading-tight">
-                      {epilogueText.description}
-                    </p>
-                  </button>
                 </div>
               </div>
 
@@ -566,33 +516,18 @@ export default function App() {
             {/* Central Canvas Zone */}
             <main className="w-full xl:flex-1 min-w-0 flex flex-col gap-6" id="main-column">
 
-              {showEpilogue ? (
-                <div className="bg-gradient-to-r from-[#2a0d0d]/55 to-[#1a0808]/40 px-5 py-4 rounded-2xl border-2 border-rose-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="epilogue-alert-banner">
-                  <div className="absolute right-0 top-0 text-[100px] text-rose-950/25 font-sans font-black pointer-events-none select-none leading-none">
-                    11
-                  </div>
-                  <Swords className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
-                  <div className="space-y-1">
-                    <h2 className="text-sm font-bold text-white leading-none">
-                      {t.activeMission}: {epilogueText.name}
-                    </h2>
-                    <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
-                      {epilogueText.description}
-                    </p>
-                  </div>
-                </div>
-              ) : showPrologue ? (
-                <div className="bg-gradient-to-r from-[#2a1408]/55 to-[#1a0a08]/40 px-5 py-4 rounded-2xl border-2 border-orange-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="prologue-alert-banner">
+              {isStealth ? (
+                <div className="bg-gradient-to-r from-[#2a1408]/55 to-[#1a0a08]/40 px-5 py-4 rounded-2xl border-2 border-orange-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="stealth-alert-banner">
                   <div className="absolute right-0 top-0 text-[100px] text-orange-950/25 font-sans font-black pointer-events-none select-none leading-none">
-                    00
+                    {String(currentMission.id).padStart(2, '0')}
                   </div>
                   <Skull className="w-5 h-5 text-orange-400 shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <h2 className="text-sm font-bold text-white leading-none">
-                      {t.activeMission}: {prologueText.name}
+                      {t.activeMission}: {currentMissionText.name}
                     </h2>
                     <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
-                      {prologueText.description}
+                      {currentMissionText.description}
                     </p>
                   </div>
                 </div>
@@ -600,45 +535,45 @@ export default function App() {
                 /* Responsive Active Level Alert Info Banner */
                 <div className="bg-gradient-to-r from-[#17082e]/45 to-[#240c42]/30 px-5 py-4 rounded-2xl border-2 border-fuchsia-500/25 flex items-start gap-3 relative overflow-hidden animate-[pulse_6000ms_infinite]" id="level-alert-banner">
                   <div className="absolute right-0 top-0 text-[100px] text-fuchsia-950/20 font-sans font-black pointer-events-none select-none leading-none">
-                    {String(currentLevelData.id).padStart(2, '0')}
+                    {String(currentMission.id).padStart(2, '0')}
                   </div>
                   <Info className="w-5 h-5 text-fuchsia-450 shrink-0 mt-0.5" />
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h2 className="text-sm font-bold text-white leading-none">
-                        {t.activeMission}: {currentLevelText.name}
+                        {t.activeMission}: {currentMissionText.name}
                       </h2>
-                      <span className="text-[10px] bg-fuchsia-950/50 text-fuchsia-300 font-mono px-1.5 py-0.5 rounded border border-fuchsia-500/30 font-extrabold">
-                        {t.safetyAt} {currentLevelData.endX}m
-                      </span>
+                      {currentMission.type === 'platformer' && (
+                        <span className="text-[10px] bg-fuchsia-950/50 text-fuchsia-300 font-mono px-1.5 py-0.5 rounded border border-fuchsia-500/30 font-extrabold">
+                          {t.safetyAt} {currentMission.endX}m
+                        </span>
+                      )}
                     </div>
                     <p className="text-xs text-gray-300 max-w-2xl leading-relaxed">
-                      {currentLevelText.description} {t.bannerSuffix}
+                      {currentMissionText.description} {t.bannerSuffix}
                     </p>
                   </div>
                 </div>
               )}
 
               {/* Game Viewport screen component */}
-              {showEpilogue ? (
-                <FighterCanvas
-                  fight={EPILOGUE_FIGHT}
+              {currentMission.type === 'stealth' ? (
+                <StealthCanvas
+                  mission={currentMission}
+                  fights={world.fights}
+                  quizzes={world.quizzes}
+                  questionPool={world.questionPool}
                   language={language}
-                  onComplete={handleEpilogueComplete}
-                  paused={isPausedByMenu}
-                  onTogglePause={() => setMenuOpen((prev) => !prev)}
-                />
-              ) : showPrologue ? (
-                <PrologueCanvas
-                  prologue={PROLOGUE_LEVEL}
-                  language={language}
-                  onComplete={handlePrologueComplete}
+                  onComplete={handleNextLevel}
                   paused={isPausedByMenu}
                   onTogglePause={() => setMenuOpen((prev) => !prev)}
                 />
               ) : (
                 <GameCanvas
-                  level={currentLevelData}
+                  level={currentMission}
+                  fights={world.fights}
+                  quizzes={world.quizzes}
+                  questionPool={world.questionPool}
                   settings={settings}
                   stats={stats}
                   onStatsChange={setStats}

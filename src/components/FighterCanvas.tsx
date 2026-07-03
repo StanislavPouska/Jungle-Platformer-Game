@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { FightConfig, FighterSpriteId } from '../types';
+import { FightDef, FighterSpriteId } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, Swords, Play } from 'lucide-react';
 import { Lang, UI } from '../i18n';
@@ -28,6 +28,7 @@ const STRIKE_MS = 130;
 const RECOVER_MS = 220;
 const HURT_FLASH_MS = 170;
 const LOSE_BUBBLE_MS = 15000;
+const LOSE_DEFEAT_MS = 1400; // retreat beat before a non-retry loss hands control back
 
 type AttackPhase = 'none' | 'windup' | 'strike' | 'recover';
 type FightPhase = 'intro' | 'fighting' | 'player_win' | 'player_lose';
@@ -53,10 +54,16 @@ interface FireParticle {
   x: number; y: number; vx: number; vy: number; life: number; maxLife: number; size: number;
 }
 
-interface PrologueCanvasProps {
-  fight: FightConfig;
+interface FighterCanvasProps {
+  fight: FightDef;
   language: Lang;
   onComplete: () => void;
+  // Called on defeat when fight.restartOnLose is false — the host decides
+  // what a loss means (death + mission restart). Without it, losing always
+  // retries the fight in place.
+  onLose?: () => void;
+  // Header tag; defaults to the EPILOGUE label for the standalone finale.
+  label?: string;
   paused: boolean;
   onTogglePause: () => void;
 }
@@ -71,11 +78,18 @@ export default function FighterCanvas({
   fight,
   language,
   onComplete,
+  onLose,
+  label,
   paused,
   onTogglePause,
-}: PrologueCanvasProps) {
+}: FighterCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const t = UI[language];
+
+  // Keep the latest onLose without restarting the game loop when the parent
+  // re-renders and hands us a new callback identity.
+  const onLoseRef = useRef(onLose);
+  onLoseRef.current = onLose;
 
   const [controlsPrompt, setControlsPrompt] = useState(true);
   const [won, setWon] = useState(false);
@@ -87,6 +101,7 @@ export default function FighterCanvas({
     opponent: makeFighter(fight.opponent.sprite, fight.opponent.maxHp, fight.opponent.damage, fight.opponent.parryChance, 2000, -1),
     phase: 'intro' as FightPhase,
     loseTimer: 0,
+    loseNotified: false,
     particles: [] as FireParticle[],
     keys: {} as { [key: string]: boolean },
     tick: 0,
@@ -99,6 +114,7 @@ export default function FighterCanvas({
     s.opponent = makeFighter(fight.opponent.sprite, fight.opponent.maxHp, fight.opponent.damage, fight.opponent.parryChance, canvasWidth + 60, -1);
     s.phase = 'intro';
     s.loseTimer = 0;
+    s.loseNotified = false;
     s.particles = [];
     s.keys = {};
     setWon(false);
@@ -159,6 +175,11 @@ export default function FighterCanvas({
       const p = s.player;
       const o = s.opponent;
       const W = view.width;
+
+      // Opt-in state mirror for automated playtesting (window.__DBG truthy).
+      if ((window as any).__DBG) {
+        (window as any).__fightDbg = { phase: s.phase, pHp: p.hp, oHp: o.hp, pX: p.x, oX: o.x };
+      }
 
       // Always face toward the other fighter
       p.facing = p.x <= o.x ? 1 : -1;
@@ -241,11 +262,20 @@ export default function FighterCanvas({
           setWon(true);
         }
       } else if (s.phase === 'player_lose') {
-        // Mowgli retreats into the gate; speech bubble for 15s, then restart
+        // Mowgli retreats into the gate
         p.facing = -1;
         if (p.x > 46) p.x -= FLEE_SPEED;
         s.loseTimer += dt;
-        if (s.loseTimer >= LOSE_BUBBLE_MS) {
+        if (!fight.restartOnLose && onLoseRef.current) {
+          // Loss is fatal: brief retreat beat, then hand control back to the
+          // host mission (death + restart) instead of retrying in place.
+          if (s.loseTimer >= LOSE_DEFEAT_MS && !s.loseNotified) {
+            s.loseNotified = true;
+            onLoseRef.current();
+            return;
+          }
+        } else if (s.loseTimer >= LOSE_BUBBLE_MS) {
+          // Retry flavor: speech bubble for a while, then restart the fight.
           resetFight(W);
         }
       }
@@ -355,8 +385,8 @@ export default function FighterCanvas({
 
     drawHud(ctx, canvas, s);
 
-    // Lose speech bubble over Mowgli's head
-    if (s.phase === 'player_lose') {
+    // Lose speech bubble over Mowgli's head (retry flavor only)
+    if (s.phase === 'player_lose' && (fight.restartOnLose || !onLoseRef.current)) {
       drawSpeechBubble(ctx, s.player.x, GROUND_Y - 150, t.fighterLoseBubble, canvas.width);
     }
   };
@@ -706,7 +736,7 @@ export default function FighterCanvas({
       <div className="w-full flex justify-between items-center mb-2 px-1 text-gray-300 font-mono text-xs select-none">
         <div className="flex items-center gap-2">
           <Landmark className="w-4 h-4 text-amber-400" />
-          <span className="text-amber-300 font-bold uppercase tracking-wider">{t.epilogueStage}</span>
+          <span className="text-amber-300 font-bold uppercase tracking-wider">{label ?? t.epilogueStage}</span>
         </div>
         <button
           onClick={onTogglePause}

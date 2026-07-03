@@ -73,44 +73,18 @@ export interface Particle {
   type: 'leaf' | 'sparkle' | 'dust' | 'splash';
 }
 
-export interface PuzzleQuestion {
-  question: string;
-  choices: string[];
-  correctIndex: number;
-}
+// The story chapter a mission belongs to — drives the title card shown when
+// the player crosses into a new chapter.
+export type ChapterId = 'prologue' | 'ch1' | 'ch2' | 'epilogue';
 
-export interface PuzzleGate {
-  triggerX: number; // invisible wall x-position blocking progress until solved
-  title: string;
-  intro: string;
-  questions: PuzzleQuestion[];
-}
-
-// Background art for a level. Presets reference the layered SVG sets already
-// shipped in /public/assets; a per-level custom image (data URL) overrides them.
+// Background art for a mission. Presets reference the layered SVG sets already
+// shipped in /public/assets; a per-mission custom image (data URL) overrides them.
 export type LevelBackgroundId = 'jungle' | 'night_raid';
 
-export interface Level {
-  id: number;
-  name: string;
-  description: string;
-  startX: number;
-  startY: number;
-  endX: number;
-  endY: number;
-  platforms: Platform[];
-  toads: Toad[];
-  collectibles: Collectible[];
-  timeLimit?: number; // seconds for timed levels
-  collectibleBonusSeconds?: number; // default extra seconds per collectible on timed levels
-  puzzle?: PuzzleGate;
-  background?: LevelBackgroundId;   // preset art set (defaults to 'jungle')
-  backgroundImage?: string;         // optional custom image (data URL) — overrides the preset
-}
-
-// --- Prologue: a stealth/crawling intro stage with its own simplified
-// movement model (no gravity or jumping — the toddler Mowgli auto-climbs
-// small steps between ground segments and hides from a patrolling tiger).
+// --- Stealth-mission building blocks: a crawling stage with its own
+// simplified movement model (no gravity or jumping — the toddler Mowgli
+// auto-climbs small steps between ground segments and hides from a
+// patrolling tiger).
 
 export interface StepPlatform {
   id: string;
@@ -129,22 +103,9 @@ export interface HidingSpot {
   kind: 'cave' | 'leaf_shadow' | 'goal_cave';
 }
 
-export interface PrologueLevel {
-  name: string;
-  description: string;
-  startX: number;
-  levelMinX: number;
-  levelMaxX: number;
-  platforms: StepPlatform[];
-  hidingSpots: HidingSpot[];
-  goalSpotId: string;
-  tigerStartX: number;
-  tigerSpeed: number;
-}
-
-// --- Fighter minigame: a config-driven 1v1 arena fight. A level (or a
-// standalone stage like the Epilogue) supplies the opponent's visuals,
-// HP, damage, and parry chance; Mowgli's stats default to 100 HP / 20 dmg.
+// --- Fight library: a config-driven 1v1 arena duel. A FightDef supplies both
+// fighters' visuals, HP, damage, and parry chance; missions launch one via a
+// placed trigger.
 
 export type FighterSpriteId = 'mowgli_torch' | 'shere_khan';
 export type FightBackgroundId = 'village';
@@ -162,7 +123,107 @@ export interface FightConfig {
   background: FightBackgroundId;
   player: FighterConfig;   // Mowgli — defaults 100 HP / 20 dmg
   opponent: FighterConfig; // input: visuals + HP + damage + parry chance
-  restartOnLose: boolean;  // Epilogue: retreat + speech bubble, then restart the fight
+  restartOnLose: boolean;  // true: retreat + speech bubble, then restart the fight
+                           // false: losing costs a death and restarts the mission
+}
+
+/** A fight in the shared library, referenced from missions by id. */
+export interface FightDef extends FightConfig {
+  id: string;
+}
+
+// --- Quiz library: a multiple-choice riddle gate. Referenced from missions by
+// id; the player must answer every question correctly to pass the trigger.
+// A gate doesn't own its questions — when it opens, `questionCount` random
+// questions are drawn from the shared question pool, filtered to the chapter
+// of the mission the gate sits in.
+
+/**
+ * One question in the shared background pool. `chapter` restricts where it can
+ * be drawn — a gate only picks questions matching its mission's story chapter.
+ * `cs` holds the Czech variant (choices align by index; correctIndex is
+ * shared); any empty string falls back to the English text at play time.
+ */
+export interface PoolQuestion {
+  id: string;
+  chapter: ChapterId;
+  question: string;
+  choices: string[];
+  correctIndex: number;
+  cs?: { question: string; choices: string[] };
+}
+
+/** Czech text variant of a quiz gate's framing text. */
+export interface QuizTextCS {
+  title: string;
+  intro: string;
+}
+
+export interface QuizDef {
+  id: string;
+  title: string;
+  intro: string;
+  questionCount: number; // how many pool questions the gate asks
+  cs?: QuizTextCS;       // Czech version — shown when the menu language is Czech
+}
+
+// --- Missions: every campaign stage is a Mission of one of two types. Fights
+// and quizzes are launched from TriggerPlacements — invisible vertical lines
+// the player cannot cross until the referenced object is beaten/solved.
+
+export type MissionType = 'platformer' | 'stealth';
+
+export interface TriggerPlacement {
+  id: string;                 // unique within the mission, e.g. 'm10-tr1'
+  kind: 'fight' | 'quiz';
+  refId: string;              // id into the fights/quizzes library
+  triggerX: number;           // world x of the invisible wall / launch line
+  chapterCard?: ChapterId;    // optionally show a chapter title card before launching
+}
+
+interface MissionBase {
+  id: number;
+  name: string;
+  description: string;
+  chapter: ChapterId;         // stored, not derived — survives reordering/insertion
+  triggers: TriggerPlacement[];
+  background?: LevelBackgroundId;   // preset art set (defaults per type)
+  backgroundImage?: string;         // optional custom image (data URL) — overrides the preset
+}
+
+export interface PlatformerMission extends MissionBase {
+  type: 'platformer';
+  startX: number;
+  startY: number;
+  endX: number;
+  endY: number;
+  platforms: Platform[];
+  toads: Toad[];
+  collectibles: Collectible[];
+  timeLimit?: number; // seconds for timed missions
+  collectibleBonusSeconds?: number; // default extra seconds per collectible on timed missions
+}
+
+export interface StealthMission extends MissionBase {
+  type: 'stealth';
+  startX: number;
+  levelMinX: number;
+  levelMaxX: number;
+  platforms: StepPlatform[];
+  hidingSpots: HidingSpot[];
+  goalSpotId: string;
+  tigerStartX: number;
+  tigerSpeed: number;
+}
+
+export type Mission = PlatformerMission | StealthMission;
+
+/** Everything the editor authors and the game plays: the whole campaign. */
+export interface WorldData {
+  missions: Mission[];
+  fights: FightDef[];
+  quizzes: QuizDef[];
+  questionPool: PoolQuestion[];
 }
 
 export interface GameSettings {
@@ -180,6 +241,6 @@ export interface GameStats {
   bananasCollected: number;
   deaths: number;
   timeElapsed: number;
-  currentLevel: number;
+  currentLevel: number; // index into WorldData.missions (name kept for save compatibility)
   gameState: 'start_screen' | 'playing' | 'paused' | 'level_completed' | 'game_over' | 'victory_screen';
 }

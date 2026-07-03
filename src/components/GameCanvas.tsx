@@ -4,11 +4,26 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { Player, Platform, Toad, Collectible, Particle, Level, GameSettings, GameStats } from '../types';
+import {
+  Player,
+  Platform,
+  Toad,
+  Collectible,
+  Particle,
+  PlatformerMission,
+  PoolQuestion,
+  TriggerPlacement,
+  FightDef,
+  QuizDef,
+  GameSettings,
+  GameStats,
+} from '../types';
 import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
-import { Lang, UI, getLevelText, getPuzzleText } from '../i18n';
+import { Lang, UI, getMissionText } from '../i18n';
+import { pickQuizQuestions } from '../quiz';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import GateOverlays from './GateOverlays';
 
 preloadAssets();
 
@@ -18,7 +33,7 @@ const BASE_H = 420;
 
 // Scans a level's platforms/toads/collectibles to find the vertical extent
 // of playable content, so the camera knows how far it may safely scroll.
-const computeVerticalBounds = (level: Level) => {
+const computeVerticalBounds = (level: PlatformerMission) => {
   let minY = Math.min(level.startY, level.endY);
   let maxY = Math.max(level.startY, level.endY);
   level.platforms.forEach((plat) => {
@@ -39,7 +54,10 @@ const computeVerticalBounds = (level: Level) => {
 };
 
 interface GameCanvasProps {
-  level: Level;
+  level: PlatformerMission;
+  fights: FightDef[];
+  quizzes: QuizDef[];
+  questionPool: PoolQuestion[];
   settings: GameSettings;
   stats: GameStats;
   onStatsChange: (newStats: GameStats | ((prev: GameStats) => GameStats)) => void;
@@ -52,6 +70,9 @@ interface GameCanvasProps {
 
 export default function GameCanvas({
   level,
+  fights,
+  quizzes,
+  questionPool,
   settings,
   stats,
   onStatsChange,
@@ -63,17 +84,27 @@ export default function GameCanvas({
 }: GameCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const t = UI[language];
-  const levelText = getLevelText(level, language);
-  const puzzleText = level.puzzle ? getPuzzleText(level.puzzle, language) : null;
+  const levelText = getMissionText(level, language);
 
   // Game state controls
   const [controlsPrompt, setControlsPrompt] = useState(true);
 
-  // Puzzle gate (quiz wall) UI state
-  const [showPuzzle, setShowPuzzle] = useState(false);
+  // Trigger gate state: the placement the player just ran into (quiz wall or
+  // fight line), plus quiz-answer UI state while a quiz gate is open. Fights
+  // with a chapterCard show the title card first ('card'), then run.
+  const [activeTrigger, setActiveTrigger] = useState<TriggerPlacement | null>(null);
+  const [gateStage, setGateStage] = useState<'card' | 'run'>('run');
+  const [gateQuestions, setGateQuestions] = useState<PoolQuestion[]>([]);
   const [puzzleAnswers, setPuzzleAnswers] = useState<number[]>([]);
   const [puzzleFeedback, setPuzzleFeedback] = useState<'idle' | 'wrong'>('idle');
-  const puzzleOpenedRef = useRef(false);
+  const gateOpenedRef = useRef(false);
+
+  // Resolve the library objects behind the open gate (dangling refs are
+  // auto-cleared in the loop before a gate ever opens).
+  const activeQuiz =
+    activeTrigger?.kind === 'quiz' ? quizzes.find((q) => q.id === activeTrigger.refId) ?? null : null;
+  const activeFight =
+    activeTrigger?.kind === 'fight' ? fights.find((f) => f.id === activeTrigger.refId) ?? null : null;
 
   // References for mutable frame-loop states (prevents React re-render lag)
   const stateRef = useRef({
@@ -112,8 +143,8 @@ export default function GameCanvas({
     victoryTimer: 0,
     isMuted: false,
     groundedPlatformId: null as string | null,
-    puzzleSolved: false,
-    puzzleHit: false,
+    clearedTriggers: {} as Record<string, boolean>,
+    pendingTriggerId: null as string | null,
   });
 
   // Keep volumes synced with audioSynth
@@ -152,12 +183,14 @@ export default function GameCanvas({
     s.deathTimer = 0;
     s.victoryTimer = 0;
     s.groundedPlatformId = null;
-    s.puzzleSolved = false;
-    s.puzzleHit = false;
-    puzzleOpenedRef.current = false;
-    setShowPuzzle(false);
+    s.clearedTriggers = {};
+    s.pendingTriggerId = null;
+    gateOpenedRef.current = false;
+    setActiveTrigger(null);
+    setGateStage('run');
     setPuzzleFeedback('idle');
-    setPuzzleAnswers(level.puzzle ? new Array(level.puzzle.questions.length).fill(-1) : []);
+    setPuzzleAnswers([]);
+    setGateQuestions([]);
 
     // Start background music loop
     audioSynth.startJungleMusic();
@@ -263,15 +296,25 @@ export default function GameCanvas({
         return;
       }
 
-      if (showPuzzle) {
-        // Freeze the frame behind the quiz modal — no physics/timer ticking
-        // while the riddle gate is open.
+      if (activeTrigger) {
+        // Freeze the frame behind an open gate (quiz modal / fight overlay /
+        // chapter card) — no physics/timer ticking while it's up.
         return;
       }
 
       const s = stateRef.current;
       const dt = timestamp - lastStamp;
       lastStamp = timestamp;
+
+      // Opt-in state mirror for automated playtesting (window.__DBG truthy).
+      if ((window as any).__DBG) {
+        (window as any).__gameDbg = {
+          x: s.player.x,
+          y: s.player.y,
+          cleared: Object.keys(s.clearedTriggers),
+          timeRemaining: s.timeRemaining,
+        };
+      }
 
       // Handle periodic game rules
       spawnPeriodicLeaves();
@@ -301,11 +344,35 @@ export default function GameCanvas({
       // COLLISION SYSTEMS
       resolveCollisions(s);
 
-      // RIDDLE GATE: open the quiz overlay the first time the player bumps
-      // into an unsolved puzzle wall
-      if (s.puzzleHit && !puzzleOpenedRef.current) {
-        puzzleOpenedRef.current = true;
-        setShowPuzzle(true);
+      // TRIGGER GATES: open the referenced quiz/fight the first time the
+      // player bumps into an uncleared trigger wall. Placements pointing at a
+      // deleted library object are auto-cleared so they can never soft-lock.
+      if (s.pendingTriggerId && !gateOpenedRef.current) {
+        const tr = level.triggers.find((x) => x.id === s.pendingTriggerId);
+        s.pendingTriggerId = null;
+        // The id can be stale from frames rendered between gate-open and the
+        // React freeze — never reopen a gate that's already been cleared.
+        if (tr && !s.clearedTriggers[tr.id]) {
+          const quiz = tr.kind === 'quiz' ? quizzes.find((q) => q.id === tr.refId) : undefined;
+          // Draw this opening's questions from the shared pool, restricted to
+          // the mission's story chapter. A dangling ref or an empty draw
+          // (nothing in the pool for this chapter) auto-clears the gate.
+          const picked = quiz ? pickQuizQuestions(questionPool, level.chapter, quiz.questionCount) : [];
+          const exists =
+            tr.kind === 'quiz' ? !!quiz && picked.length > 0 : fights.some((f) => f.id === tr.refId);
+          if (!exists) {
+            s.clearedTriggers[tr.id] = true;
+          } else {
+            gateOpenedRef.current = true;
+            if (tr.kind === 'quiz') {
+              setGateQuestions(picked);
+              setPuzzleAnswers(new Array(picked.length).fill(-1));
+              setPuzzleFeedback('idle');
+            }
+            setGateStage(tr.kind === 'fight' && tr.chapterCard ? 'card' : 'run');
+            setActiveTrigger(tr);
+          }
+        }
       }
 
       // AUDIO TRIGGER SAFETY
@@ -329,7 +396,7 @@ export default function GameCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [level, paused, settings, showPuzzle, language]);
+  }, [level, paused, settings, activeTrigger, language, questionPool]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
@@ -493,11 +560,14 @@ export default function GameCanvas({
       p.vx = 0;
     }
 
-    // Riddle Gate: invisible wall blocks progress until the quiz is solved
-    if (level.puzzle && !s.puzzleSolved && p.x + p.width > level.puzzle.triggerX) {
-      p.x = level.puzzle.triggerX - p.width;
-      if (p.vx > 0) p.vx = 0;
-      s.puzzleHit = true;
+    // Trigger gates: invisible walls block progress until the referenced
+    // quiz is solved / fight is won
+    for (const tr of level.triggers) {
+      if (!s.clearedTriggers[tr.id] && p.x + p.width > tr.triggerX) {
+        p.x = tr.triggerX - p.width;
+        if (p.vx > 0) p.vx = 0;
+        s.pendingTriggerId = tr.id;
+      }
     }
 
     // Moving Platform horizontal & vertical updates
@@ -1370,15 +1440,21 @@ export default function GameCanvas({
     setPuzzleFeedback('idle');
   };
 
+  const closeGate = () => {
+    gateOpenedRef.current = false;
+    setActiveTrigger(null);
+    setGateStage('run');
+  };
+
   const handlePuzzleSubmit = () => {
-    if (!level.puzzle) return;
-    const allCorrect = level.puzzle.questions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
+    if (!activeTrigger || !activeQuiz) return;
+    const allCorrect = gateQuestions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
     const s = stateRef.current;
 
     if (allCorrect) {
-      s.puzzleSolved = true;
-      setShowPuzzle(false);
+      s.clearedTriggers[activeTrigger.id] = true;
       setPuzzleFeedback('idle');
+      closeGate();
       audioSynth.playLevelSuccess();
       if (level.timeLimit !== undefined) {
         s.timeRemaining += 5; // reward bonus time for solving the riddle
@@ -1391,6 +1467,32 @@ export default function GameCanvas({
         s.timeRemaining = Math.max(1, s.timeRemaining - 3); // small penalty, never zeroes the clock outright
       }
     }
+  };
+
+  // Fight gate resolutions — the run (timer, score, collectibles) survives the
+  // duel because GameCanvas never unmounts while the overlay is up.
+  const handleFightWin = () => {
+    if (activeTrigger) stateRef.current.clearedTriggers[activeTrigger.id] = true;
+    closeGate();
+  };
+
+  const handleFightLose = () => {
+    // Losing a non-retry fight costs a death and restarts the mission run;
+    // the trigger stays uncleared so the duel re-arms on the way back.
+    const s = stateRef.current;
+    closeGate();
+    s.player.x = level.startX;
+    s.player.y = level.startY;
+    s.player.vx = 0;
+    s.player.vy = 0;
+    s.player.isGrounded = false;
+    s.cameraX = 0;
+    s.timeRemaining = level.timeLimit ?? 0;
+    onStatsChange((prev: GameStats) => ({
+      ...prev,
+      deaths: prev.deaths + 1,
+      score: Math.max(0, prev.score - 20),
+    }));
   };
 
   return (
@@ -1491,58 +1593,6 @@ export default function GameCanvas({
           </div>
         )}
 
-        {/* Riddle Gate quiz overlay */}
-        {showPuzzle && level.puzzle && puzzleText && (
-          <div className="absolute inset-0 bg-slate-950/95 flex flex-col items-center p-5 text-center select-none backdrop-blur-sm z-20 overflow-y-auto" id="puzzle-gate-modal">
-            <div className="w-full max-w-md space-y-4 my-auto py-2">
-              <h2 className="text-lg font-black text-amber-300 uppercase tracking-wide font-sans">{puzzleText.title}</h2>
-              <p className="text-xs text-gray-300 leading-relaxed">{puzzleText.intro}</p>
-
-              <div className="space-y-3 text-left">
-                {puzzleText.questions.map((q, qIdx) => (
-                  <div key={qIdx} className="bg-[#1d0735]/80 border border-amber-500/25 rounded-xl p-3" id={`puzzle-q-${qIdx}`}>
-                    <p className="text-xs font-bold text-white mb-2">{qIdx + 1}. {q.question}</p>
-                    <div className="grid grid-cols-1 gap-1.5">
-                      {q.choices.map((choice, cIdx) => (
-                        <button
-                          key={cIdx}
-                          onClick={() => handlePuzzleChoice(qIdx, cIdx)}
-                          className={`text-left text-[11px] px-3 py-1.5 rounded-lg border cursor-pointer transition-all ${
-                            puzzleAnswers[qIdx] === cIdx
-                              ? 'bg-amber-500/30 border-amber-400 text-amber-100 font-bold'
-                              : 'bg-slate-900/60 border-slate-700 text-gray-300 hover:bg-slate-800'
-                          }`}
-                          id={`puzzle-q-${qIdx}-choice-${cIdx}`}
-                        >
-                          {choice}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {puzzleFeedback === 'wrong' && (
-                <p className="text-xs font-bold text-rose-400" id="puzzle-feedback-wrong">
-                  {t.wrongFeedback}
-                </p>
-              )}
-
-              <button
-                onClick={handlePuzzleSubmit}
-                disabled={puzzleAnswers.some((a) => a === -1)}
-                className={`w-full font-bold text-sm px-6 py-2.5 rounded-xl border cursor-pointer ${
-                  puzzleAnswers.some((a) => a === -1)
-                    ? 'bg-slate-800 text-gray-500 border-slate-700 cursor-not-allowed'
-                    : 'bg-amber-500 hover:bg-amber-400 text-slate-950 border-amber-300 shadow-lg'
-                }`}
-                id="btn-puzzle-submit"
-              >
-                {t.answerRiddle}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Touch UI overlay - Perfect to let review users play immediately without keyboard! */}
@@ -1606,6 +1656,25 @@ export default function GameCanvas({
         </div>
 
       </div>
+
+      {/* Trigger gate overlays: quiz modal / chapter card / fight arena */}
+      <GateOverlays
+        trigger={activeTrigger}
+        stage={gateStage}
+        quiz={activeQuiz}
+        fight={activeFight}
+        questions={gateQuestions}
+        answers={puzzleAnswers}
+        feedback={puzzleFeedback}
+        onChoice={handlePuzzleChoice}
+        onSubmit={handlePuzzleSubmit}
+        onCardBegin={() => setGateStage('run')}
+        onFightWin={handleFightWin}
+        onFightLose={handleFightLose}
+        language={language}
+        paused={paused}
+        onTogglePause={onTogglePause}
+      />
 
     </div>
   );

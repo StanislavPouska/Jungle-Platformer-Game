@@ -3,30 +3,65 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState } from 'react';
-import { Level } from './types';
-import { INITIAL_LEVELS } from './data';
+import React, { useEffect, useState } from 'react';
+import { WorldData } from './types';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS } from './data';
 import LevelEditor from './components/LevelEditor';
 import { Lang, UI, LANGUAGES } from './i18n';
-import { readSaveData, writeLevelsToSave, readSavedLang, LANG_KEY } from './storage';
+import {
+  readSaveData,
+  writeWorldToSave,
+  scheduleWorldSave,
+  flushWorldSave,
+  mergeWithDefaults,
+  readSavedLang,
+  LANG_KEY,
+} from './storage';
 import { SquarePen } from 'lucide-react';
 
-// Standalone host for the level editor — what editor.exe opens. Shares the
-// game's localStorage save, so designs made here appear in the game's Load and
-// in one-click Playtest (which navigates to index.html?play=N).
+// Seed the editor's world from the shared save, merged against the built-in
+// set: recovers content an old/partial save is missing while keeping the
+// user's deliberate deletions deleted (knownDefaults tells them apart).
+function seedWorld(): WorldData {
+  const saved = readSaveData();
+  if (!saved?.world?.missions?.length) {
+    return JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }));
+  }
+  return mergeWithDefaults(saved.world, saved.knownDefaults);
+}
+
+// Standalone host for the world editor — what editor.exe opens. Shares the
+// game's localStorage save, so missions designed here appear in the game's
+// Load and in one-click Playtest (which navigates to index.html?play=N).
 export default function EditorApp() {
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
-  const [levels, setLevels] = useState<Level[]>(() => {
-    const saved = readSaveData();
-    return saved?.levels?.length ? saved.levels : JSON.parse(JSON.stringify(INITIAL_LEVELS));
-  });
+  const [world, setWorld] = useState<WorldData>(seedWorld);
   const [savedAt, setSavedAt] = useState<string | null>(null);
+  const [saveFailed, setSaveFailed] = useState(false);
   const t = UI[language];
 
-  const handleLevelsChange = (next: Level[]) => {
-    setLevels(next);
-    const data = writeLevelsToSave(next);
-    setSavedAt(data?.savedAt ?? null);
+  // Re-stamp the save on mount: persists any content the merge recovered
+  // (or a v1→v2 migration produced) and records knownDefaults so future
+  // deletions of built-ins stay durable.
+  useEffect(() => {
+    if (readSaveData()) writeWorldToSave(world);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Autosaves are debounced — push any pending write out before the page
+  // closes so the last edits aren't lost.
+  useEffect(() => {
+    const flush = () => flushWorldSave();
+    window.addEventListener('beforeunload', flush);
+    return () => window.removeEventListener('beforeunload', flush);
+  }, []);
+
+  const handleWorldChange = (next: WorldData) => {
+    setWorld(next);
+    scheduleWorldSave(next, (data) => {
+      setSavedAt(data?.savedAt ?? null);
+      setSaveFailed(data === null);
+    });
   };
 
   const handleLanguageChange = (lang: Lang) => {
@@ -39,7 +74,9 @@ export default function EditorApp() {
   };
 
   const handlePlaytest = (idx: number) => {
-    writeLevelsToSave(levels); // make sure the latest edits are persisted
+    // Persist exactly the current state, then hand off to the game.
+    scheduleWorldSave(world);
+    flushWorldSave();
     window.location.href = `index.html?play=${idx}`;
   };
 
@@ -57,7 +94,11 @@ export default function EditorApp() {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {savedAt && <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorAutosaved}</span>}
+            {saveFailed ? (
+              <span className="text-[10px] font-mono text-rose-400" id="editor-save-error">⚠ {t.editorSaveFailed}</span>
+            ) : savedAt ? (
+              <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorAutosaved}</span>
+            ) : null}
             <div className="flex gap-1 bg-[#0d071f] p-1 rounded-xl border border-purple-900/40">
               {LANGUAGES.map((l) => (
                 <button
@@ -76,7 +117,7 @@ export default function EditorApp() {
           </div>
         </header>
 
-        <LevelEditor levels={levels} onLevelsChange={handleLevelsChange} onPlaytest={handlePlaytest} language={language} />
+        <LevelEditor world={world} onWorldChange={handleWorldChange} onPlaytest={handlePlaytest} language={language} />
       </div>
     </div>
   );

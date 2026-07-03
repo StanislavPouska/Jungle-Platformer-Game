@@ -3,9 +3,20 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Level } from './types';
+import {
+  ChapterId,
+  FightDef,
+  Mission,
+  PlatformerMission,
+  PoolQuestion,
+  QuizDef,
+  StealthMission,
+  TriggerPlacement,
+} from './types';
 
-export const INITIAL_LEVELS: Level[] = [
+// The ten classic platformer stages, authored without their mission wrapper
+// (type/chapter/triggers are stamped on below when INITIAL_MISSIONS is built).
+const RAW_LEVELS: Omit<PlatformerMission, 'type' | 'chapter' | 'triggers'>[] = [
   {
     id: 1,
     name: 'Canopy Crossing',
@@ -275,29 +286,7 @@ export const INITIAL_LEVELS: Level[] = [
       { id: 'l7-c4', x: 1380, y: 230, type: 'star', collected: false, bobOffset: 60 },
       { id: 'l7-c5', x: 1620, y: 310, type: 'banana', collected: false, bobOffset: 200 },
       { id: 'l7-c6', x: 1900, y: 230, type: 'mango', collected: false, bobOffset: 100 }
-    ],
-    puzzle: {
-      triggerX: 1010,
-      title: 'The Bandar-Log Riddle Gate',
-      intro: "Ancient stone monkeys block the path forward. They will only move aside for someone who truly knows Mowgli's tale — answer all three correctly to pass!",
-      questions: [
-        {
-          question: 'Who is the wise black panther who finds baby Mowgli and brings him to the wolf pack?',
-          choices: ['Baloo', 'Bagheera', 'Kaa', 'Akela'],
-          correctIndex: 1
-        },
-        {
-          question: "Which laid-back bear teaches Mowgli about \"The Bare Necessities\"?",
-          choices: ['Baloo', 'Shere Khan', 'Colonel Hathi', 'Bagheera'],
-          correctIndex: 0
-        },
-        {
-          question: 'Which tiger wants to hunt Mowgli because he fears and hates Man?',
-          choices: ['Kaa', 'King Louie', 'Shere Khan', 'Akela'],
-          correctIndex: 2
-        }
-      ]
-    }
+    ]
   },
   {
     id: 8,
@@ -406,6 +395,153 @@ export const INITIAL_LEVELS: Level[] = [
       { id: 'l10-c8', x: 2350, y: 230, type: 'banana', collected: false, bobOffset: 60 }
     ]
   }
+];
+
+// --- Quiz library -----------------------------------------------------------
+
+export const INITIAL_QUIZZES: QuizDef[] = [
+  {
+    id: 'bandar-riddle',
+    title: 'The Bandar-Log Riddle Gate',
+    intro: "Ancient stone monkeys block the path forward. They will only move aside for someone who truly knows Mowgli's tale — answer all questions correctly to pass!",
+    questionCount: 3,
+    cs: {
+      title: 'Hádanková Brána Bandar-Logů',
+      intro: 'Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny otázky, abys mohl projít!',
+    },
+  }
+];
+
+// --- Question pool -----------------------------------------------------------
+
+// The shared background pool quiz gates draw from. A gate asks
+// `questionCount` random questions whose `chapter` matches the chapter of the
+// mission it's placed in. Ids of questions migrated out of a pre-pool save
+// follow the same `<quizId>-q<n>` scheme so merges never duplicate them.
+export const INITIAL_QUESTIONS: PoolQuestion[] = [
+  {
+    id: 'bandar-riddle-q1',
+    chapter: 'ch2',
+    question: 'Who is the wise black panther who finds baby Mowgli and brings him to the wolf pack?',
+    choices: ['Baloo', 'Bagheera', 'Kaa', 'Akela'],
+    correctIndex: 1,
+    cs: {
+      question: 'Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?',
+      choices: ['Balú', 'Baghíra', 'Kaa', 'Akela'],
+    },
+  },
+  {
+    id: 'bandar-riddle-q2',
+    chapter: 'ch2',
+    question: "Which laid-back bear teaches Mowgli about \"The Bare Necessities\"?",
+    choices: ['Baloo', 'Shere Khan', 'Colonel Hathi', 'Bagheera'],
+    correctIndex: 0,
+    cs: {
+      question: 'Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?',
+      choices: ['Balú', 'Šér Chán', 'Plukovník Hathi', 'Baghíra'],
+    },
+  },
+  {
+    id: 'bandar-riddle-q3',
+    chapter: 'ch2',
+    question: 'Which tiger wants to hunt Mowgli because he fears and hates Man?',
+    choices: ['Kaa', 'King Louie', 'Shere Khan', 'Akela'],
+    correctIndex: 2,
+    cs: {
+      question: 'Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?',
+      choices: ['Kaa', 'Král Louie', 'Šér Chán', 'Akela'],
+    },
+  },
+];
+
+// --- Fight library ------------------------------------------------------------
+
+// The final duel: grown Mowgli with a torch faces Shere Khan in front of the
+// village fence. Mowgli keeps the canonical 100 HP / 20 dmg; Shere Khan is
+// the tunable opponent — equal HP, equal damage, with a 20% chance to parry.
+export const INITIAL_FIGHTS: FightDef[] = [
+  {
+    id: 'shere-khan-final',
+    name: 'The Final Reckoning',
+    description: "Years later, a grown Mowgli returns to the village with fire in hand. Shere Khan stalks in for one last duel before the watching villagers. End it.",
+    background: 'village',
+    player: {
+      sprite: 'mowgli_torch',
+      maxHp: 100,
+      damage: 20,
+      parryChance: 0, // the player's parry is manual (Down key), not probabilistic
+    },
+    opponent: {
+      sprite: 'shere_khan',
+      maxHp: 100,
+      damage: 20,
+      parryChance: 0.2,
+    },
+    restartOnLose: true,
+  }
+];
+
+// --- Missions -----------------------------------------------------------------
+
+// Mission 0 — the stealth prologue. Step heights between adjacent platforms
+// stay within each platform's own height (30px) so the toddler can always
+// auto-climb without jumping.
+const PROLOGUE_MISSION: StealthMission = {
+  id: 0,
+  type: 'stealth',
+  chapter: 'prologue',
+  name: "Shere Khan's Raid",
+  description: 'Shere Khan has attacked the village! As a crawling toddler, Mowgli must creep through the jungle, ducking into caves and leaf-shadows to hide from the prowling tiger.',
+  background: 'night_raid',
+  triggers: [],
+  startX: 60,
+  levelMinX: 20,
+  levelMaxX: 2340,
+  platforms: [
+    { id: 'sp1', x: 30, width: 220, y: 420, height: 30 },
+    { id: 'sp2', x: 250, width: 180, y: 400, height: 30 },
+    { id: 'sp3', x: 430, width: 190, y: 420, height: 30 },
+    { id: 'sp4', x: 620, width: 170, y: 440, height: 30 },
+    { id: 'sp5', x: 790, width: 200, y: 420, height: 30 },
+    { id: 'sp6', x: 990, width: 180, y: 400, height: 30 },
+    { id: 'sp7', x: 1170, width: 190, y: 420, height: 30 },
+    { id: 'sp8', x: 1360, width: 170, y: 440, height: 30 },
+    { id: 'sp9', x: 1530, width: 200, y: 420, height: 30 },
+    { id: 'sp10', x: 1730, width: 180, y: 400, height: 30 },
+    { id: 'sp11', x: 1910, width: 190, y: 420, height: 30 },
+    { id: 'sp12', x: 2100, width: 240, y: 410, height: 30 },
+  ],
+  hidingSpots: [
+    { id: 'hs1', x: 330, y: 400, width: 70, height: 70, kind: 'cave' },
+    { id: 'hs2', x: 700, y: 440, width: 70, height: 70, kind: 'leaf_shadow' },
+    { id: 'hs3', x: 1080, y: 400, width: 70, height: 70, kind: 'cave' },
+    { id: 'hs4', x: 1450, y: 440, width: 70, height: 70, kind: 'leaf_shadow' },
+    { id: 'hs5', x: 1820, y: 400, width: 70, height: 70, kind: 'cave' },
+    { id: 'goal', x: 2200, y: 410, width: 110, height: 95, kind: 'goal_cave' },
+  ],
+  goalSpotId: 'goal',
+  tigerStartX: 480,
+  tigerSpeed: 1.8,
+};
+
+// Fight/quiz placements the default campaign ships with, keyed by mission id.
+// Mission 7 keeps its riddle gate; mission 10 ends in the Shere Khan duel
+// (with the Epilogue title card) just before the village goal.
+const DEFAULT_TRIGGERS: Record<number, TriggerPlacement[]> = {
+  7: [{ id: 'm7-tr1', kind: 'quiz', refId: 'bandar-riddle', triggerX: 1010 }],
+  10: [{ id: 'm10-tr1', kind: 'fight', refId: 'shere-khan-final', triggerX: 2250, chapterCard: 'epilogue' }],
+};
+
+const chapterForLevelId = (id: number): ChapterId => (id <= 4 ? 'ch1' : 'ch2');
+
+export const INITIAL_MISSIONS: Mission[] = [
+  PROLOGUE_MISSION,
+  ...RAW_LEVELS.map((l): PlatformerMission => ({
+    ...l,
+    type: 'platformer',
+    chapter: chapterForLevelId(l.id),
+    triggers: DEFAULT_TRIGGERS[l.id] ?? [],
+  })),
 ];
 
 export const INITIAL_SETTINGS = {
