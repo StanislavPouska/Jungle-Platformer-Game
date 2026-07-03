@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Mission, QuizDef, FightDef } from './types';
+import { Mission, PoolQuestion, QuizDef, FightDef } from './types';
 import { INITIAL_MISSIONS, INITIAL_FIGHTS } from './data';
 
 export type Lang = 'en' | 'cs';
@@ -284,6 +284,11 @@ export const UI = {
     editorTextLang: 'Text language',
     editorCsFallbackHint: 'Empty Czech fields fall back to the English text in-game.',
     editorCsStructureHint: 'Questions, choices and the correct answer are managed in the English version.',
+    editorQuestionCount: 'Questions asked',
+    editorQuestionPool: 'Question Pool',
+    editorPoolHint: 'Gates draw their questions at random from this shared pool, filtered by the chapter of the mission they are placed in.',
+    editorQuestionChapter: 'Chapter',
+    editorPoolEmptyChapter: 'No pool question matches this chapter — a gate placed there opens automatically.',
 
     editorUsedBy: 'Placed in',
     editorCascadeConfirm1: 'This object is launched by triggers in: ',
@@ -560,6 +565,11 @@ export const UI = {
     editorTextLang: 'Jazyk textu',
     editorCsFallbackHint: 'Prázdná česká pole ve hře použijí anglický text.',
     editorCsStructureHint: 'Otázky, možnosti a správná odpověď se spravují v anglické verzi.',
+    editorQuestionCount: 'Počet otázek',
+    editorQuestionPool: 'Zásobník Otázek',
+    editorPoolHint: 'Brány losují otázky náhodně z tohoto společného zásobníku, filtrované podle kapitoly mise, ve které jsou umístěny.',
+    editorQuestionChapter: 'Kapitola',
+    editorPoolEmptyChapter: 'Této kapitole neodpovídá žádná otázka ze zásobníku — brána se tam otevře automaticky.',
 
     editorUsedBy: 'Umístěno v',
     editorCascadeConfirm1: 'Tento objekt spouštějí spouštěče v: ',
@@ -638,25 +648,24 @@ export function getMissionText(mission: Mission, lang: Lang): LevelText {
   return { name: mission.name, description: mission.description };
 }
 
-interface PuzzleTextOverride {
-  title: string;
-  intro: string;
-  questions: { question: string; choices: string[] }[];
-}
-
-// Quiz text is fully self-contained: every QuizDef carries its own optional
-// Czech variant (`cs`), editable in the quiz editor alongside the English
-// text. Resolution is per string — any empty/missing Czech field falls back
-// to its English counterpart, so partially translated quizzes stay playable.
-export function getQuizText(quiz: QuizDef, lang: Lang): PuzzleTextOverride {
+// Quiz text is fully self-contained: gates and pool questions each carry
+// their own optional Czech variant (`cs`), editable in the quiz editor
+// alongside the English text. Resolution is per string — any empty/missing
+// Czech field falls back to its English counterpart, so partially translated
+// content stays playable.
+export function getQuizText(quiz: QuizDef, lang: Lang): { title: string; intro: string } {
   const cs = lang === 'cs' ? quiz.cs : undefined;
   return {
     title: (cs?.title ?? '').trim() || quiz.title,
     intro: (cs?.intro ?? '').trim() || quiz.intro,
-    questions: quiz.questions.map((q, qi) => ({
-      question: (cs?.questions[qi]?.question ?? '').trim() || q.question,
-      choices: q.choices.map((choice, ci) => (cs?.questions[qi]?.choices[ci] ?? '').trim() || choice),
-    })),
+  };
+}
+
+export function getQuestionText(q: PoolQuestion, lang: Lang): { question: string; choices: string[] } {
+  const cs = lang === 'cs' ? q.cs : undefined;
+  return {
+    question: (cs?.question ?? '').trim() || q.question,
+    choices: q.choices.map((choice, ci) => (cs?.choices[ci] ?? '').trim() || choice),
   };
 }
 

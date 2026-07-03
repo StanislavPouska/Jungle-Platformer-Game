@@ -11,6 +11,7 @@ import {
   Collectible,
   Particle,
   PlatformerMission,
+  PoolQuestion,
   TriggerPlacement,
   FightDef,
   QuizDef,
@@ -20,6 +21,7 @@ import {
 import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
+import { pickQuizQuestions } from '../quiz';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
@@ -55,6 +57,7 @@ interface GameCanvasProps {
   level: PlatformerMission;
   fights: FightDef[];
   quizzes: QuizDef[];
+  questionPool: PoolQuestion[];
   settings: GameSettings;
   stats: GameStats;
   onStatsChange: (newStats: GameStats | ((prev: GameStats) => GameStats)) => void;
@@ -69,6 +72,7 @@ export default function GameCanvas({
   level,
   fights,
   quizzes,
+  questionPool,
   settings,
   stats,
   onStatsChange,
@@ -90,6 +94,7 @@ export default function GameCanvas({
   // with a chapterCard show the title card first ('card'), then run.
   const [activeTrigger, setActiveTrigger] = useState<TriggerPlacement | null>(null);
   const [gateStage, setGateStage] = useState<'card' | 'run'>('run');
+  const [gateQuestions, setGateQuestions] = useState<PoolQuestion[]>([]);
   const [puzzleAnswers, setPuzzleAnswers] = useState<number[]>([]);
   const [puzzleFeedback, setPuzzleFeedback] = useState<'idle' | 'wrong'>('idle');
   const gateOpenedRef = useRef(false);
@@ -185,6 +190,7 @@ export default function GameCanvas({
     setGateStage('run');
     setPuzzleFeedback('idle');
     setPuzzleAnswers([]);
+    setGateQuestions([]);
 
     // Start background music loop
     audioSynth.startJungleMusic();
@@ -347,17 +353,20 @@ export default function GameCanvas({
         // The id can be stale from frames rendered between gate-open and the
         // React freeze — never reopen a gate that's already been cleared.
         if (tr && !s.clearedTriggers[tr.id]) {
+          const quiz = tr.kind === 'quiz' ? quizzes.find((q) => q.id === tr.refId) : undefined;
+          // Draw this opening's questions from the shared pool, restricted to
+          // the mission's story chapter. A dangling ref or an empty draw
+          // (nothing in the pool for this chapter) auto-clears the gate.
+          const picked = quiz ? pickQuizQuestions(questionPool, level.chapter, quiz.questionCount) : [];
           const exists =
-            tr.kind === 'quiz'
-              ? quizzes.some((q) => q.id === tr.refId)
-              : fights.some((f) => f.id === tr.refId);
+            tr.kind === 'quiz' ? !!quiz && picked.length > 0 : fights.some((f) => f.id === tr.refId);
           if (!exists) {
             s.clearedTriggers[tr.id] = true;
           } else {
             gateOpenedRef.current = true;
             if (tr.kind === 'quiz') {
-              const quiz = quizzes.find((q) => q.id === tr.refId)!;
-              setPuzzleAnswers(new Array(quiz.questions.length).fill(-1));
+              setGateQuestions(picked);
+              setPuzzleAnswers(new Array(picked.length).fill(-1));
               setPuzzleFeedback('idle');
             }
             setGateStage(tr.kind === 'fight' && tr.chapterCard ? 'card' : 'run');
@@ -387,7 +396,7 @@ export default function GameCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [level, paused, settings, activeTrigger, language]);
+  }, [level, paused, settings, activeTrigger, language, questionPool]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
@@ -1439,7 +1448,7 @@ export default function GameCanvas({
 
   const handlePuzzleSubmit = () => {
     if (!activeTrigger || !activeQuiz) return;
-    const allCorrect = activeQuiz.questions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
+    const allCorrect = gateQuestions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
     const s = stateRef.current;
 
     if (allCorrect) {
@@ -1654,6 +1663,7 @@ export default function GameCanvas({
         stage={gateStage}
         quiz={activeQuiz}
         fight={activeFight}
+        questions={gateQuestions}
         answers={puzzleAnswers}
         feedback={puzzleFeedback}
         onChoice={handlePuzzleChoice}

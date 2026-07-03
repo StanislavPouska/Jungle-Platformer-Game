@@ -12,12 +12,12 @@ import {
   GameSettings,
   Mission,
   PlatformerMission,
-  PuzzleQuestion,
+  PoolQuestion,
   QuizDef,
   TriggerPlacement,
   WorldData,
 } from './types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_SETTINGS } from './data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SETTINGS } from './data';
 import { Lang } from './i18n';
 
 export const SAVE_KEY = 'jungle-platformer-save-v1';
@@ -30,15 +30,90 @@ export interface KnownDefaults {
   missions?: number[];
   fights?: string[];
   quizzes?: string[];
+  questions?: string[];
 }
 
 export interface SaveData {
-  version: 2;
+  version: 3;
   stats: GameStats;
   settings: GameSettings;
   world: WorldData;
   savedAt: string;
   knownDefaults?: KnownDefaults;
+}
+
+// --- v2 legacy shape (quizzes still owned their questions, no question pool) --
+
+interface LegacyQuestion {
+  question: string;
+  choices: string[];
+  correctIndex: number;
+}
+
+interface QuizDefV2 {
+  id: string;
+  title: string;
+  intro: string;
+  questions: LegacyQuestion[];
+  cs?: { title: string; intro: string; questions: { question: string; choices: string[] }[] };
+}
+
+interface SaveDataV2 {
+  version: 2;
+  stats: GameStats;
+  settings: GameSettings;
+  world: Omit<WorldData, 'quizzes' | 'questionPool'> & { quizzes: QuizDefV2[] };
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+/**
+ * Carve every quiz's embedded questions out into the shared question pool.
+ * All pre-pool questions belong to the chapter-2 riddle content, so they are
+ * flagged 'ch2'. Migrated ids follow the `<quizId>-q<n>` scheme — identical to
+ * the ids the built-in pool uses — so later merges never duplicate them.
+ */
+function migrateV2(v2: SaveDataV2): SaveData {
+  const pool: PoolQuestion[] = [];
+  const quizzes: QuizDef[] = (v2.world.quizzes ?? []).map((q) => {
+    (q.questions ?? []).forEach((qq, i) => {
+      const cs = q.cs?.questions?.[i];
+      pool.push({
+        id: `${q.id}-q${i + 1}`,
+        chapter: 'ch2',
+        question: qq.question,
+        choices: qq.choices,
+        correctIndex: qq.correctIndex,
+        ...(cs && (cs.question || cs.choices.some(Boolean))
+          ? { cs: { question: cs.question ?? '', choices: qq.choices.map((_, ci) => cs.choices[ci] ?? '') } }
+          : {}),
+      });
+    });
+    return {
+      id: q.id,
+      title: q.title,
+      intro: q.intro,
+      questionCount: Math.max(1, (q.questions ?? []).length),
+      ...(q.cs ? { cs: { title: q.cs.title, intro: q.cs.intro } } : {}),
+    };
+  });
+  return {
+    version: 3,
+    stats: v2.stats,
+    settings: v2.settings,
+    world: { ...v2.world, quizzes, questionPool: pool },
+    savedAt: v2.savedAt,
+    knownDefaults: v2.knownDefaults
+      ? {
+          ...v2.knownDefaults,
+          // The save "knows" exactly the default questions its migration
+          // produced — deleted-quiz defaults stay recoverable via the merge.
+          questions: pool
+            .filter((p) => INITIAL_QUESTIONS.some((d) => d.id === p.id))
+            .map((p) => p.id),
+        }
+      : undefined,
+  };
 }
 
 // --- v1 legacy shape (levels-only saves written before the mission refactor) --
@@ -47,7 +122,7 @@ interface LegacyPuzzle {
   triggerX: number;
   title: string;
   intro: string;
-  questions: PuzzleQuestion[];
+  questions: LegacyQuestion[];
 }
 
 type LegacyLevel = Omit<PlatformerMission, 'type' | 'chapter' | 'triggers'> & {
@@ -70,26 +145,44 @@ interface SaveDataV1 {
  */
 function migrateV1(v1: SaveDataV1): SaveData {
   const quizzes: QuizDef[] = JSON.parse(JSON.stringify(INITIAL_QUIZZES));
+  const questionPool: PoolQuestion[] = JSON.parse(JSON.stringify(INITIAL_QUESTIONS));
   const fights = JSON.parse(JSON.stringify(INITIAL_FIGHTS)) as WorldData['fights'];
   const missions: Mission[] = [JSON.parse(JSON.stringify(INITIAL_MISSIONS[0]))];
+
+  // Does this embedded puzzle carry exactly the default riddle content? Then
+  // it can reuse the built-in gate + pool questions instead of new entries.
+  const matchesDefault = (puzzle: LegacyPuzzle): boolean => {
+    const def = INITIAL_QUIZZES.find((q) => q.id === 'bandar-riddle');
+    const defQuestions = INITIAL_QUESTIONS.filter((q) => q.id.startsWith('bandar-riddle-'));
+    return (
+      !!def &&
+      def.title === puzzle.title &&
+      def.intro === puzzle.intro &&
+      JSON.stringify(defQuestions.map((q) => ({ question: q.question, choices: q.choices, correctIndex: q.correctIndex }))) ===
+        JSON.stringify(puzzle.questions)
+    );
+  };
 
   for (const lvl of v1.levels ?? []) {
     const { puzzle, ...rest } = lvl;
     const triggers: TriggerPlacement[] = [];
     if (puzzle) {
-      // Reuse a library quiz with identical content (the unmodified default),
-      // otherwise carve the embedded puzzle out into its own library entry.
-      let quiz = quizzes.find(
-        (q) =>
-          q.title === puzzle.title &&
-          q.intro === puzzle.intro &&
-          JSON.stringify(q.questions) === JSON.stringify(puzzle.questions),
-      );
-      if (!quiz) {
-        quiz = { id: `quiz-l${lvl.id}`, title: puzzle.title, intro: puzzle.intro, questions: puzzle.questions };
-        quizzes.push(quiz);
+      let quizId = 'bandar-riddle';
+      if (!matchesDefault(puzzle)) {
+        // Carve the embedded puzzle out: a gate asking all of its questions,
+        // plus its questions in the pool (pre-pool content is chapter 2's).
+        quizId = `quiz-l${lvl.id}`;
+        quizzes.push({
+          id: quizId,
+          title: puzzle.title,
+          intro: puzzle.intro,
+          questionCount: Math.max(1, puzzle.questions.length),
+        });
+        puzzle.questions.forEach((qq, i) => {
+          questionPool.push({ id: `${quizId}-q${i + 1}`, chapter: 'ch2', ...qq });
+        });
       }
-      triggers.push({ id: `m${lvl.id}-tr1`, kind: 'quiz', refId: quiz.id, triggerX: puzzle.triggerX });
+      triggers.push({ id: `m${lvl.id}-tr1`, kind: 'quiz', refId: quizId, triggerX: puzzle.triggerX });
     }
     missions.push({
       ...rest,
@@ -113,17 +206,18 @@ function migrateV1(v1: SaveDataV1): SaveData {
   }
 
   return {
-    version: 2,
+    version: 3,
     // The prologue now occupies mission index 0, shifting every level down one.
     stats: { ...v1.stats, currentLevel: (v1.stats?.currentLevel ?? 0) + 1 },
     settings: v1.settings,
-    world: { missions, fights, quizzes },
+    world: { missions, fights, quizzes, questionPool },
     savedAt: v1.savedAt,
     knownDefaults: v1.knownDefaultIds
       ? {
           missions: [0, ...v1.knownDefaultIds],
           fights: INITIAL_FIGHTS.map((f) => f.id),
           quizzes: INITIAL_QUIZZES.map((q) => q.id),
+          questions: INITIAL_QUESTIONS.map((q) => q.id),
         }
       : undefined,
   };
@@ -133,8 +227,9 @@ export function readSaveData(): SaveData | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveData | SaveDataV1;
-    if ('version' in parsed && parsed.version === 2 && parsed.world) return parsed;
+    const parsed = JSON.parse(raw) as SaveData | SaveDataV2 | SaveDataV1;
+    if ('version' in parsed && parsed.version === 3 && parsed.world) return parsed;
+    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV2(parsed);
     if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV1(parsed);
     return null;
   } catch {
@@ -191,18 +286,24 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
   const merged: WorldData = {
     missions: mergeCollection(saved.missions ?? [], INITIAL_MISSIONS, known?.missions),
     fights: mergeCollection(saved.fights ?? [], INITIAL_FIGHTS, known?.fights),
-    // Saves written before quizzes carried their own Czech text lack `cs`.
-    // Backfill the built-in translation, but only while the English content is
-    // still pristine — an English-edited quiz would otherwise pair user text
-    // with an unrelated default translation (pre-feature it showed English).
+    // Saves written before quizzes/questions carried their own Czech text lack
+    // `cs`. Backfill the built-in translation, but only while the English
+    // content is still pristine — an English-edited entry would otherwise pair
+    // user text with an unrelated default translation.
     quizzes: mergeCollection(saved.quizzes ?? [], INITIAL_QUIZZES, known?.quizzes).map((q) => {
       if (q.cs) return q;
       const def = INITIAL_QUIZZES.find((d) => d.id === q.id);
+      const pristine = def && def.title === q.title && def.intro === q.intro;
+      return pristine && def.cs ? { ...q, cs: def.cs } : q;
+    }),
+    questionPool: mergeCollection(saved.questionPool ?? [], INITIAL_QUESTIONS, known?.questions).map((q) => {
+      if (q.cs) return q;
+      const def = INITIAL_QUESTIONS.find((d) => d.id === q.id);
       const pristine =
         def &&
-        def.title === q.title &&
-        def.intro === q.intro &&
-        JSON.stringify(def.questions) === JSON.stringify(q.questions);
+        def.question === q.question &&
+        def.correctIndex === q.correctIndex &&
+        JSON.stringify(def.choices) === JSON.stringify(q.choices);
       return pristine && def.cs ? { ...q, cs: def.cs } : q;
     }),
   };
@@ -213,11 +314,12 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
 export function writeSaveData(data: Omit<SaveData, 'version' | 'knownDefaults'>): SaveData | null {
   const stamped: SaveData = {
     ...data,
-    version: 2,
+    version: 3,
     knownDefaults: {
       missions: INITIAL_MISSIONS.map((m) => m.id),
       fights: INITIAL_FIGHTS.map((f) => f.id),
       quizzes: INITIAL_QUIZZES.map((q) => q.id),
+      questions: INITIAL_QUESTIONS.map((q) => q.id),
     },
   };
   try {

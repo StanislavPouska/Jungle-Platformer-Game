@@ -4,10 +4,11 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StealthMission, StepPlatform, HidingSpot, TriggerPlacement, FightDef, QuizDef } from '../types';
+import { StealthMission, StepPlatform, HidingSpot, TriggerPlacement, FightDef, PoolQuestion, QuizDef } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, RotateCcw, Play } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
+import { pickQuizQuestions } from '../quiz';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
@@ -57,6 +58,7 @@ interface StealthCanvasProps {
   mission: StealthMission;
   fights: FightDef[];
   quizzes: QuizDef[];
+  questionPool: PoolQuestion[];
   language: Lang;
   onComplete: () => void;
   paused: boolean;
@@ -67,6 +69,7 @@ export default function StealthCanvas({
   mission: prologue,
   fights,
   quizzes,
+  questionPool,
   language,
   onComplete,
   paused,
@@ -85,6 +88,7 @@ export default function StealthCanvas({
   // wall stops the crawl until the referenced quiz is solved / fight is won.
   const [activeTrigger, setActiveTrigger] = useState<TriggerPlacement | null>(null);
   const [gateStage, setGateStage] = useState<'card' | 'run'>('run');
+  const [gateQuestions, setGateQuestions] = useState<PoolQuestion[]>([]);
   const [puzzleAnswers, setPuzzleAnswers] = useState<number[]>([]);
   const [puzzleFeedback, setPuzzleFeedback] = useState<'idle' | 'wrong'>('idle');
   const gateOpenedRef = useRef(false);
@@ -157,6 +161,7 @@ export default function StealthCanvas({
     setGateStage('run');
     setPuzzleFeedback('idle');
     setPuzzleAnswers([]);
+    setGateQuestions([]);
     setCaught(false);
     setEscaped(false);
     audioSynth.startJungleMusic();
@@ -369,17 +374,20 @@ export default function StealthCanvas({
         // The id can be stale from frames rendered between gate-open and the
         // React freeze — never reopen a gate that's already been cleared.
         if (tr && !s.clearedTriggers[tr.id]) {
+          const quiz = tr.kind === 'quiz' ? quizzes.find((q) => q.id === tr.refId) : undefined;
+          // Draw this opening's questions from the shared pool, restricted to
+          // the mission's story chapter. A dangling ref or an empty draw
+          // (nothing in the pool for this chapter) auto-clears the gate.
+          const picked = quiz ? pickQuizQuestions(questionPool, prologue.chapter, quiz.questionCount) : [];
           const exists =
-            tr.kind === 'quiz'
-              ? quizzes.some((q) => q.id === tr.refId)
-              : fights.some((f) => f.id === tr.refId);
+            tr.kind === 'quiz' ? !!quiz && picked.length > 0 : fights.some((f) => f.id === tr.refId);
           if (!exists) {
             s.clearedTriggers[tr.id] = true;
           } else {
             gateOpenedRef.current = true;
             if (tr.kind === 'quiz') {
-              const quiz = quizzes.find((q) => q.id === tr.refId)!;
-              setPuzzleAnswers(new Array(quiz.questions.length).fill(-1));
+              setGateQuestions(picked);
+              setPuzzleAnswers(new Array(picked.length).fill(-1));
               setPuzzleFeedback('idle');
             }
             setGateStage(tr.kind === 'fight' && tr.chapterCard ? 'card' : 'run');
@@ -411,7 +419,7 @@ export default function StealthCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [prologue, paused, escaped, activeTrigger]);
+  }, [prologue, paused, escaped, activeTrigger, questionPool]);
 
   // ---- trigger gate resolutions ---------------------------------------------
   const closeGate = () => {
@@ -431,7 +439,7 @@ export default function StealthCanvas({
 
   const handlePuzzleSubmit = () => {
     if (!activeTrigger || !activeQuiz) return;
-    const allCorrect = activeQuiz.questions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
+    const allCorrect = gateQuestions.every((q, i) => puzzleAnswers[i] === q.correctIndex);
     if (allCorrect) {
       stateRef.current.clearedTriggers[activeTrigger.id] = true;
       setPuzzleFeedback('idle');
@@ -896,6 +904,7 @@ export default function StealthCanvas({
         trigger={activeTrigger}
         stage={gateStage}
         quiz={activeQuiz}
+        questions={gateQuestions}
         fight={activeFight}
         answers={puzzleAnswers}
         feedback={puzzleFeedback}

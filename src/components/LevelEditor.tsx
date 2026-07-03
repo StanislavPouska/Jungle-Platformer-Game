@@ -21,7 +21,7 @@ import {
   TriggerPlacement,
   WorldData,
 } from '../types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES } from '../data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS } from '../data';
 import { Lang, UI, UIStrings } from '../i18n';
 import {
   Plus,
@@ -399,7 +399,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
     id,
     title: t.editorNewQuizTitle,
     intro: t.editorNewQuizIntro,
-    questions: [{ question: t.editorNewQuestion, choices: ['A', 'B'], correctIndex: 0 }],
+    questionCount: 3,
   });
 
   // Placing a trigger may also have to seed the library (when it's empty),
@@ -544,7 +544,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
     if (!window.confirm(t.editorConfirmReset)) return;
     onWorldChange(
       JSON.parse(
-        JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES }),
+        JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }),
       ),
     );
     selectMission(0);

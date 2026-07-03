@@ -4,8 +4,8 @@
  */
 
 import React from 'react';
-import { TriggerPlacement, FightDef, QuizDef } from '../types';
-import { Lang, UI, getQuizText, getFightText } from '../i18n';
+import { TriggerPlacement, FightDef, PoolQuestion, QuizDef } from '../types';
+import { Lang, UI, getQuizText, getQuestionText, getFightText } from '../i18n';
 import FighterCanvas from './FighterCanvas';
 import ChapterCard from './ChapterCard';
 
@@ -17,6 +17,7 @@ interface GateOverlaysProps {
   trigger: TriggerPlacement | null;
   stage: 'card' | 'run';
   quiz: QuizDef | null;   // resolved library object when trigger.kind === 'quiz'
+  questions: PoolQuestion[]; // the pool questions drawn for this gate opening
   fight: FightDef | null; // resolved library object when trigger.kind === 'fight'
   answers: number[];
   feedback: 'idle' | 'wrong';
@@ -34,6 +35,7 @@ export default function GateOverlays({
   trigger,
   stage,
   quiz,
+  questions,
   fight,
   answers,
   feedback,
@@ -58,8 +60,10 @@ export default function GateOverlays({
           <p className="text-xs text-gray-300 leading-relaxed">{quizText.intro}</p>
 
           <div className="space-y-3 text-left">
-            {quizText.questions.map((q, qIdx) => (
-              <div key={qIdx} className="bg-[#1d0735]/80 border border-amber-500/25 rounded-xl p-3" id={`puzzle-q-${qIdx}`}>
+            {questions.map((pq, qIdx) => {
+              const q = getQuestionText(pq, language);
+              return (
+              <div key={pq.id} className="bg-[#1d0735]/80 border border-amber-500/25 rounded-xl p-3" id={`puzzle-q-${qIdx}`}>
                 <p className="text-xs font-bold text-white mb-2">{qIdx + 1}. {q.question}</p>
                 <div className="grid grid-cols-1 gap-1.5">
                   {q.choices.map((choice, cIdx) => (
@@ -78,7 +82,8 @@ export default function GateOverlays({
                   ))}
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
 
           {feedback === 'wrong' && (

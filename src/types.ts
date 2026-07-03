@@ -134,30 +134,37 @@ export interface FightDef extends FightConfig {
 
 // --- Quiz library: a multiple-choice riddle gate. Referenced from missions by
 // id; the player must answer every question correctly to pass the trigger.
+// A gate doesn't own its questions — when it opens, `questionCount` random
+// questions are drawn from the shared question pool, filtered to the chapter
+// of the mission the gate sits in.
 
-export interface PuzzleQuestion {
+/**
+ * One question in the shared background pool. `chapter` restricts where it can
+ * be drawn — a gate only picks questions matching its mission's story chapter.
+ * `cs` holds the Czech variant (choices align by index; correctIndex is
+ * shared); any empty string falls back to the English text at play time.
+ */
+export interface PoolQuestion {
+  id: string;
+  chapter: ChapterId;
   question: string;
   choices: string[];
   correctIndex: number;
+  cs?: { question: string; choices: string[] };
 }
 
-/**
- * Czech text variant of a quiz, structurally parallel to the English fields
- * (questions/choices align by index; correctIndex is shared). Any empty
- * string falls back to the English text at play time.
- */
+/** Czech text variant of a quiz gate's framing text. */
 export interface QuizTextCS {
   title: string;
   intro: string;
-  questions: { question: string; choices: string[] }[];
 }
 
 export interface QuizDef {
   id: string;
   title: string;
   intro: string;
-  questions: PuzzleQuestion[];
-  cs?: QuizTextCS; // Czech version — shown when the menu language is Czech
+  questionCount: number; // how many pool questions the gate asks
+  cs?: QuizTextCS;       // Czech version — shown when the menu language is Czech
 }
 
 // --- Missions: every campaign stage is a Mission of one of two types. Fights
@@ -216,6 +223,7 @@ export interface WorldData {
   missions: Mission[];
   fights: FightDef[];
   quizzes: QuizDef[];
+  questionPool: PoolQuestion[];
 }
 
 export interface GameSettings {

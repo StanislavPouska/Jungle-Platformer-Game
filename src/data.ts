@@ -8,6 +8,7 @@ import {
   FightDef,
   Mission,
   PlatformerMission,
+  PoolQuestion,
   QuizDef,
   StealthMission,
   TriggerPlacement,
@@ -402,43 +403,55 @@ export const INITIAL_QUIZZES: QuizDef[] = [
   {
     id: 'bandar-riddle',
     title: 'The Bandar-Log Riddle Gate',
-    intro: "Ancient stone monkeys block the path forward. They will only move aside for someone who truly knows Mowgli's tale — answer all three correctly to pass!",
-    questions: [
-      {
-        question: 'Who is the wise black panther who finds baby Mowgli and brings him to the wolf pack?',
-        choices: ['Baloo', 'Bagheera', 'Kaa', 'Akela'],
-        correctIndex: 1
-      },
-      {
-        question: "Which laid-back bear teaches Mowgli about \"The Bare Necessities\"?",
-        choices: ['Baloo', 'Shere Khan', 'Colonel Hathi', 'Bagheera'],
-        correctIndex: 0
-      },
-      {
-        question: 'Which tiger wants to hunt Mowgli because he fears and hates Man?',
-        choices: ['Kaa', 'King Louie', 'Shere Khan', 'Akela'],
-        correctIndex: 2
-      }
-    ],
+    intro: "Ancient stone monkeys block the path forward. They will only move aside for someone who truly knows Mowgli's tale — answer all questions correctly to pass!",
+    questionCount: 3,
     cs: {
       title: 'Hádanková Brána Bandar-Logů',
-      intro: 'Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny tři otázky, abys mohl projít!',
-      questions: [
-        {
-          question: 'Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?',
-          choices: ['Balú', 'Baghíra', 'Kaa', 'Akela'],
-        },
-        {
-          question: 'Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?',
-          choices: ['Balú', 'Šér Chán', 'Plukovník Hathi', 'Baghíra'],
-        },
-        {
-          question: 'Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?',
-          choices: ['Kaa', 'Král Louie', 'Šér Chán', 'Akela'],
-        },
-      ],
+      intro: 'Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny otázky, abys mohl projít!',
     },
   }
+];
+
+// --- Question pool -----------------------------------------------------------
+
+// The shared background pool quiz gates draw from. A gate asks
+// `questionCount` random questions whose `chapter` matches the chapter of the
+// mission it's placed in. Ids of questions migrated out of a pre-pool save
+// follow the same `<quizId>-q<n>` scheme so merges never duplicate them.
+export const INITIAL_QUESTIONS: PoolQuestion[] = [
+  {
+    id: 'bandar-riddle-q1',
+    chapter: 'ch2',
+    question: 'Who is the wise black panther who finds baby Mowgli and brings him to the wolf pack?',
+    choices: ['Baloo', 'Bagheera', 'Kaa', 'Akela'],
+    correctIndex: 1,
+    cs: {
+      question: 'Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?',
+      choices: ['Balú', 'Baghíra', 'Kaa', 'Akela'],
+    },
+  },
+  {
+    id: 'bandar-riddle-q2',
+    chapter: 'ch2',
+    question: "Which laid-back bear teaches Mowgli about \"The Bare Necessities\"?",
+    choices: ['Baloo', 'Shere Khan', 'Colonel Hathi', 'Bagheera'],
+    correctIndex: 0,
+    cs: {
+      question: 'Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?',
+      choices: ['Balú', 'Šér Chán', 'Plukovník Hathi', 'Baghíra'],
+    },
+  },
+  {
+    id: 'bandar-riddle-q3',
+    chapter: 'ch2',
+    question: 'Which tiger wants to hunt Mowgli because he fears and hates Man?',
+    choices: ['Kaa', 'King Louie', 'Shere Khan', 'Akela'],
+    correctIndex: 2,
+    cs: {
+      question: 'Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?',
+      choices: ['Kaa', 'Král Louie', 'Šér Chán', 'Akela'],
+    },
+  },
 ];
 
 // --- Fight library ------------------------------------------------------------
