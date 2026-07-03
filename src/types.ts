@@ -141,11 +141,23 @@ export interface PuzzleQuestion {
   correctIndex: number;
 }
 
+/**
+ * Czech text variant of a quiz, structurally parallel to the English fields
+ * (questions/choices align by index; correctIndex is shared). Any empty
+ * string falls back to the English text at play time.
+ */
+export interface QuizTextCS {
+  title: string;
+  intro: string;
+  questions: { question: string; choices: string[] }[];
+}
+
 export interface QuizDef {
   id: string;
   title: string;
   intro: string;
   questions: PuzzleQuestion[];
+  cs?: QuizTextCS; // Czech version — shown when the menu language is Czech
 }
 
 // --- Missions: every campaign stage is a Mission of one of two types. Fights

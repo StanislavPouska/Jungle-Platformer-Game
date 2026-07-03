@@ -419,7 +419,25 @@ export const INITIAL_QUIZZES: QuizDef[] = [
         choices: ['Kaa', 'King Louie', 'Shere Khan', 'Akela'],
         correctIndex: 2
       }
-    ]
+    ],
+    cs: {
+      title: 'Hádanková Brána Bandar-Logů',
+      intro: 'Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny tři otázky, abys mohl projít!',
+      questions: [
+        {
+          question: 'Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?',
+          choices: ['Balú', 'Baghíra', 'Kaa', 'Akela'],
+        },
+        {
+          question: 'Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?',
+          choices: ['Balú', 'Šér Chán', 'Plukovník Hathi', 'Baghíra'],
+        },
+        {
+          question: 'Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?',
+          choices: ['Kaa', 'Král Louie', 'Šér Chán', 'Akela'],
+        },
+      ],
+    },
   }
 ];
 

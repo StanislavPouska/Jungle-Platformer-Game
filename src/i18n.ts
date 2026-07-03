@@ -4,7 +4,7 @@
  */
 
 import { Mission, QuizDef, FightDef } from './types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES } from './data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS } from './data';
 
 export type Lang = 'en' | 'cs';
 
@@ -281,6 +281,9 @@ export const UI = {
     editorAddChoice: 'Add choice',
     editorCorrectPick: 'correct',
     editorChoiceLabel: 'Choice',
+    editorTextLang: 'Text language',
+    editorCsFallbackHint: 'Empty Czech fields fall back to the English text in-game.',
+    editorCsStructureHint: 'Questions, choices and the correct answer are managed in the English version.',
 
     editorUsedBy: 'Placed in',
     editorCascadeConfirm1: 'This object is launched by triggers in: ',
@@ -554,6 +557,9 @@ export const UI = {
     editorAddChoice: 'Přidat možnost',
     editorCorrectPick: 'správná',
     editorChoiceLabel: 'Možnost',
+    editorTextLang: 'Jazyk textu',
+    editorCsFallbackHint: 'Prázdná česká pole ve hře použijí anglický text.',
+    editorCsStructureHint: 'Otázky, možnosti a správná odpověď se spravují v anglické verzi.',
 
     editorUsedBy: 'Umístěno v',
     editorCascadeConfirm1: 'Tento objekt spouštějí spouštěče v: ',
@@ -638,46 +644,19 @@ interface PuzzleTextOverride {
   questions: { question: string; choices: string[] }[];
 }
 
-// Czech override for the Bandar-Log riddle gate, keyed by quiz id.
-const QUIZ_TEXT_CS: Record<string, PuzzleTextOverride> = {
-  'bandar-riddle': {
-    title: 'Hádanková Brána Bandar-Logů',
-    intro: "Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny tři otázky, abys mohl projít!",
-    questions: [
-      {
-        question: 'Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?',
-        choices: ['Balú', 'Baghíra', 'Kaa', 'Akela'],
-      },
-      {
-        question: 'Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?',
-        choices: ['Balú', 'Šér Chán', 'Plukovník Hathi', 'Baghíra'],
-      },
-      {
-        question: 'Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?',
-        choices: ['Kaa', 'Král Louie', 'Šér Chán', 'Akela'],
-      },
-    ],
-  },
-};
-
+// Quiz text is fully self-contained: every QuizDef carries its own optional
+// Czech variant (`cs`), editable in the quiz editor alongside the English
+// text. Resolution is per string — any empty/missing Czech field falls back
+// to its English counterpart, so partially translated quizzes stay playable.
 export function getQuizText(quiz: QuizDef, lang: Lang): PuzzleTextOverride {
-  if (lang === 'cs' && QUIZ_TEXT_CS[quiz.id]) {
-    // Same pristine rule as missions: the canned translation only applies
-    // while the quiz still matches its built-in content.
-    const def = INITIAL_QUIZZES.find((d) => d.id === quiz.id);
-    if (
-      def &&
-      def.title === quiz.title &&
-      def.intro === quiz.intro &&
-      JSON.stringify(def.questions) === JSON.stringify(quiz.questions)
-    ) {
-      return QUIZ_TEXT_CS[quiz.id];
-    }
-  }
+  const cs = lang === 'cs' ? quiz.cs : undefined;
   return {
-    title: quiz.title,
-    intro: quiz.intro,
-    questions: quiz.questions.map((q) => ({ question: q.question, choices: q.choices })),
+    title: (cs?.title ?? '').trim() || quiz.title,
+    intro: (cs?.intro ?? '').trim() || quiz.intro,
+    questions: quiz.questions.map((q, qi) => ({
+      question: (cs?.questions[qi]?.question ?? '').trim() || q.question,
+      choices: q.choices.map((choice, ci) => (cs?.questions[qi]?.choices[ci] ?? '').trim() || choice),
+    })),
   };
 }
 

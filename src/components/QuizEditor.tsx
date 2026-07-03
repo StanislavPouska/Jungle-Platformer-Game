@@ -4,10 +4,22 @@
  */
 
 import React, { useState } from 'react';
-import { QuizDef, WorldData } from '../types';
-import { Lang, UI } from '../i18n';
+import { QuizDef, QuizTextCS, WorldData } from '../types';
+import { Lang, UI, LANGUAGES } from '../i18n';
 import { Plus, Copy, Trash2, X, HelpCircle } from 'lucide-react';
 import { TextField, TextAreaField, makeLibraryId } from './editorFields';
+
+// Czech variant aligned to the quiz's current structure (same question and
+// choice counts, missing strings as ''). Alignment happens on read; structural
+// edits mirror onto `cs` where it exists, so indexes never drift.
+const alignedCs = (qz: QuizDef): QuizTextCS => ({
+  title: qz.cs?.title ?? '',
+  intro: qz.cs?.intro ?? '',
+  questions: qz.questions.map((q, qi) => ({
+    question: qz.cs?.questions[qi]?.question ?? '',
+    choices: q.choices.map((_, ci) => qz.cs?.questions[qi]?.choices[ci] ?? ''),
+  })),
+});
 
 // Quiz-library pane of the editor: define reusable riddle gates that missions
 // place as quiz triggers. Every question must be answered correctly to pass.
@@ -21,7 +33,11 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
   const t = UI[language];
   const quizzes = world.quizzes;
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Which text variant the form edits — playtime picks by the menu language.
+  const [textLang, setTextLang] = useState<Lang>('en');
   const quiz = quizzes.find((q) => q.id === selectedId) ?? quizzes[0] ?? null;
+  const csView = textLang === 'cs';
+  const cs = quiz ? alignedCs(quiz) : null;
 
   const update = (mutator: (q: QuizDef) => QuizDef) => {
     if (!quiz) return;
@@ -30,6 +46,9 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
       quizzes: quizzes.map((q) => (q.id === quiz.id ? mutator(q) : q)),
     });
   };
+
+  const updateCs = (mutator: (v: QuizTextCS) => QuizTextCS) =>
+    update((qz) => ({ ...qz, cs: mutator(alignedCs(qz)) }));
 
   const handleNew = () => {
     const blank: QuizDef = {
@@ -119,8 +138,40 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
       {/* Quiz form */}
       {quiz && (
         <div className="flex-1 min-w-0 bg-[#180a2d]/80 rounded-2xl p-4 border border-purple-500/20 space-y-4 w-full" id="quiz-form">
-          <TextField label={t.editorName} value={quiz.title} onChange={(v) => update((q) => ({ ...q, title: v }))} id="editor-quiz-title" />
-          <TextAreaField label={t.editorQuizIntro} value={quiz.intro} onChange={(v) => update((q) => ({ ...q, intro: v }))} />
+          {/* Which language's text the fields below edit */}
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400">{t.editorTextLang}</span>
+            <div className="flex gap-1 bg-[#0c0419] p-1 rounded-lg border border-purple-900/50">
+              {LANGUAGES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setTextLang(l.code)}
+                  className={`px-2 py-0.5 rounded-md text-sm leading-none cursor-pointer ${textLang === l.code ? 'bg-amber-600/60 ring-1 ring-amber-400' : 'hover:bg-purple-950/60 opacity-70'}`}
+                  title={l.label}
+                  id={`quiz-textlang-${l.code}`}
+                >
+                  {l.flag}
+                </button>
+              ))}
+            </div>
+          </div>
+          {csView && (
+            <p className="text-[10px] text-amber-200/70 leading-snug" id="quiz-cs-hint">
+              {t.editorCsFallbackHint} {t.editorCsStructureHint}
+            </p>
+          )}
+
+          {csView && cs ? (
+            <>
+              <TextField label={t.editorName} value={cs.title} onChange={(v) => updateCs((c) => ({ ...c, title: v }))} id="editor-quiz-title-cs" />
+              <TextAreaField label={t.editorQuizIntro} value={cs.intro} onChange={(v) => updateCs((c) => ({ ...c, intro: v }))} />
+            </>
+          ) : (
+            <>
+              <TextField label={t.editorName} value={quiz.title} onChange={(v) => update((q) => ({ ...q, title: v }))} id="editor-quiz-title" />
+              <TextAreaField label={t.editorQuizIntro} value={quiz.intro} onChange={(v) => update((q) => ({ ...q, intro: v }))} />
+            </>
+          )}
 
           <div className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-300">{t.editorQuestions}</div>
           <div className="space-y-3">
@@ -128,22 +179,44 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
               <div key={qi} className="bg-[#0c0419]/60 rounded-xl p-3 border border-amber-900/40 space-y-2" id={`quiz-question-${qi}`}>
                 <div className="flex items-end gap-2">
                   <div className="flex-1">
-                    <TextField
-                      label={`${t.editorQuestionLabel} ${qi + 1}`}
-                      value={q.question}
-                      onChange={(v) => updateQuestion(qi, (qq) => ({ ...qq, question: v }))}
-                      id={`quiz-q-${qi}-text`}
-                    />
+                    {csView && cs ? (
+                      <TextField
+                        label={`${t.editorQuestionLabel} ${qi + 1}`}
+                        value={cs.questions[qi].question}
+                        onChange={(v) =>
+                          updateCs((c) => ({
+                            ...c,
+                            questions: c.questions.map((cq, i) => (i === qi ? { ...cq, question: v } : cq)),
+                          }))
+                        }
+                        id={`quiz-q-${qi}-text-cs`}
+                      />
+                    ) : (
+                      <TextField
+                        label={`${t.editorQuestionLabel} ${qi + 1}`}
+                        value={q.question}
+                        onChange={(v) => updateQuestion(qi, (qq) => ({ ...qq, question: v }))}
+                        id={`quiz-q-${qi}-text`}
+                      />
+                    )}
                   </div>
-                  <button
-                    onClick={() => update((qz) => ({ ...qz, questions: qz.questions.filter((_, i) => i !== qi) }))}
-                    disabled={quiz.questions.length <= 1}
-                    className="p-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 cursor-pointer disabled:opacity-40"
-                    title={t.editorDeleteItem}
-                    id={`quiz-q-${qi}-delete`}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {!csView && (
+                    <button
+                      onClick={() =>
+                        update((qz) => ({
+                          ...qz,
+                          questions: qz.questions.filter((_, i) => i !== qi),
+                          cs: qz.cs ? { ...qz.cs, questions: qz.cs.questions.filter((_, i) => i !== qi) } : qz.cs,
+                        }))
+                      }
+                      disabled={quiz.questions.length <= 1}
+                      className="p-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 cursor-pointer disabled:opacity-40"
+                      title={t.editorDeleteItem}
+                      id={`quiz-q-${qi}-delete`}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
 
                 <div className="space-y-1.5">
@@ -154,42 +227,88 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
                         name={`quiz-${quiz.id}-q-${qi}-correct`}
                         checked={q.correctIndex === ci}
                         onChange={() => updateQuestion(qi, (qq) => ({ ...qq, correctIndex: ci }))}
-                        className="accent-amber-400 w-3.5 h-3.5 cursor-pointer"
+                        disabled={csView}
+                        className="accent-amber-400 w-3.5 h-3.5 cursor-pointer disabled:cursor-default"
                         title={t.editorCorrectPick}
                         id={`quiz-q-${qi}-correct-${ci}`}
                       />
-                      <input
-                        value={choice}
-                        onChange={(e) =>
-                          updateQuestion(qi, (qq) => ({
-                            ...qq,
-                            choices: qq.choices.map((c, i) => (i === ci ? e.target.value : c)),
-                          }))
-                        }
-                        className="flex-1 bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-amber-500"
-                        placeholder={`${t.editorChoiceLabel} ${ci + 1}`}
-                        id={`quiz-q-${qi}-choice-${ci}`}
-                      />
-                      <button
-                        onClick={() =>
-                          updateQuestion(qi, (qq) => ({
-                            ...qq,
-                            choices: qq.choices.filter((_, i) => i !== ci),
-                            correctIndex: Math.min(qq.correctIndex - (ci < qq.correctIndex ? 1 : 0), qq.choices.length - 2),
-                          }))
-                        }
-                        disabled={q.choices.length <= 2}
-                        className="p-1 rounded-md text-rose-300 hover:text-rose-200 cursor-pointer disabled:opacity-30"
-                        title={t.editorDeleteItem}
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      {csView && cs ? (
+                        <input
+                          value={cs.questions[qi].choices[ci]}
+                          onChange={(e) =>
+                            updateCs((c) => ({
+                              ...c,
+                              questions: c.questions.map((cq, i) =>
+                                i === qi ? { ...cq, choices: cq.choices.map((cc, j) => (j === ci ? e.target.value : cc)) } : cq,
+                              ),
+                            }))
+                          }
+                          className="flex-1 bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-amber-500"
+                          placeholder={choice || `${t.editorChoiceLabel} ${ci + 1}`}
+                          id={`quiz-q-${qi}-choice-${ci}-cs`}
+                        />
+                      ) : (
+                        <input
+                          value={choice}
+                          onChange={(e) =>
+                            updateQuestion(qi, (qq) => ({
+                              ...qq,
+                              choices: qq.choices.map((c, i) => (i === ci ? e.target.value : c)),
+                            }))
+                          }
+                          className="flex-1 bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-amber-500"
+                          placeholder={`${t.editorChoiceLabel} ${ci + 1}`}
+                          id={`quiz-q-${qi}-choice-${ci}`}
+                        />
+                      )}
+                      {!csView && (
+                        <button
+                          onClick={() =>
+                            update((qz) => ({
+                              ...qz,
+                              questions: qz.questions.map((qq, i) =>
+                                i === qi
+                                  ? {
+                                      ...qq,
+                                      choices: qq.choices.filter((_, j) => j !== ci),
+                                      correctIndex: Math.min(qq.correctIndex - (ci < qq.correctIndex ? 1 : 0), qq.choices.length - 2),
+                                    }
+                                  : qq,
+                              ),
+                              cs: qz.cs
+                                ? {
+                                    ...qz.cs,
+                                    questions: qz.cs.questions.map((cq, i) =>
+                                      i === qi ? { ...cq, choices: cq.choices.filter((_, j) => j !== ci) } : cq,
+                                    ),
+                                  }
+                                : qz.cs,
+                            }))
+                          }
+                          disabled={q.choices.length <= 2}
+                          className="p-1 rounded-md text-rose-300 hover:text-rose-200 cursor-pointer disabled:opacity-30"
+                          title={t.editorDeleteItem}
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   ))}
                 </div>
-                {q.choices.length < 4 && (
+                {!csView && q.choices.length < 4 && (
                   <button
-                    onClick={() => updateQuestion(qi, (qq) => ({ ...qq, choices: [...qq.choices, ''] }))}
+                    onClick={() =>
+                      update((qz) => ({
+                        ...qz,
+                        questions: qz.questions.map((qq, i) => (i === qi ? { ...qq, choices: [...qq.choices, ''] } : qq)),
+                        cs: qz.cs
+                          ? {
+                              ...qz.cs,
+                              questions: qz.cs.questions.map((cq, i) => (i === qi ? { ...cq, choices: [...cq.choices, ''] } : cq)),
+                            }
+                          : qz.cs,
+                      }))
+                    }
                     className="flex items-center gap-1 text-[10px] text-amber-300 hover:text-amber-200 cursor-pointer"
                     id={`quiz-q-${qi}-add-choice`}
                   >
@@ -200,18 +319,23 @@ export default function QuizEditor({ world, onWorldChange, language }: QuizEdito
             ))}
           </div>
 
-          <button
-            onClick={() =>
-              update((qz) => ({
-                ...qz,
-                questions: [...qz.questions, { question: t.editorNewQuestion, choices: ['A', 'B'], correctIndex: 0 }],
-              }))
-            }
-            className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-md bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-200 text-[11px] cursor-pointer"
-            id="quiz-add-question"
-          >
-            <Plus className="w-3.5 h-3.5" />{t.editorAddQuestion}
-          </button>
+          {!csView && (
+            <button
+              onClick={() =>
+                update((qz) => ({
+                  ...qz,
+                  questions: [...qz.questions, { question: t.editorNewQuestion, choices: ['A', 'B'], correctIndex: 0 }],
+                  cs: qz.cs
+                    ? { ...qz.cs, questions: [...qz.cs.questions, { question: '', choices: ['', ''] }] }
+                    : qz.cs,
+                }))
+              }
+              className="flex items-center justify-center gap-1.5 w-full py-1.5 rounded-md bg-amber-900/30 hover:bg-amber-800/40 border border-amber-700/40 text-amber-200 text-[11px] cursor-pointer"
+              id="quiz-add-question"
+            >
+              <Plus className="w-3.5 h-3.5" />{t.editorAddQuestion}
+            </button>
+          )}
 
           {used.length > 0 && (
             <p className="text-[10px] font-mono text-gray-400" id="quiz-used-by">

@@ -191,7 +191,20 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
   const merged: WorldData = {
     missions: mergeCollection(saved.missions ?? [], INITIAL_MISSIONS, known?.missions),
     fights: mergeCollection(saved.fights ?? [], INITIAL_FIGHTS, known?.fights),
-    quizzes: mergeCollection(saved.quizzes ?? [], INITIAL_QUIZZES, known?.quizzes),
+    // Saves written before quizzes carried their own Czech text lack `cs`.
+    // Backfill the built-in translation, but only while the English content is
+    // still pristine — an English-edited quiz would otherwise pair user text
+    // with an unrelated default translation (pre-feature it showed English).
+    quizzes: mergeCollection(saved.quizzes ?? [], INITIAL_QUIZZES, known?.quizzes).map((q) => {
+      if (q.cs) return q;
+      const def = INITIAL_QUIZZES.find((d) => d.id === q.id);
+      const pristine =
+        def &&
+        def.title === q.title &&
+        def.intro === q.intro &&
+        JSON.stringify(def.questions) === JSON.stringify(q.questions);
+      return pristine && def.cs ? { ...q, cs: def.cs } : q;
+    }),
   };
   return JSON.parse(JSON.stringify(merged));
 }
