@@ -12,6 +12,7 @@ import {
   Particle,
   PlatformerMission,
   PoolQuestion,
+  SpriteDef,
   TriggerPlacement,
   FightDef,
   QuizDef,
@@ -22,6 +23,7 @@ import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
+import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
@@ -58,6 +60,7 @@ interface GameCanvasProps {
   fights: FightDef[];
   quizzes: QuizDef[];
   questionPool: PoolQuestion[];
+  sprites: SpriteDef[];
   settings: GameSettings;
   stats: GameStats;
   onStatsChange: (newStats: GameStats | ((prev: GameStats) => GameStats)) => void;
@@ -73,6 +76,7 @@ export default function GameCanvas({
   fights,
   quizzes,
   questionPool,
+  sprites,
   settings,
   stats,
   onStatsChange,
@@ -396,7 +400,7 @@ export default function GameCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [level, paused, settings, activeTrigger, language, questionPool]);
+  }, [level, paused, settings, activeTrigger, language, questionPool, sprites]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
@@ -893,6 +897,17 @@ export default function GameCanvas({
         }
       }
 
+      // Sprite override: a custom placed sprite, or an uploaded image on the
+      // platform's built-in type sprite, replaces the procedural texture.
+      const platSprite = findSprite(sprites, plat.spriteId) ?? findSprite(sprites, plat.type);
+      if (platSprite) {
+        const img = spriteImage(platSprite, performance.now());
+        if (img) {
+          ctx.drawImage(img, dx, plat.y, dw, plat.height);
+          return;
+        }
+      }
+
       // Platform moss pattern textures
       if (plat.type === 'moss_log') {
         // Brown Wood core
@@ -999,6 +1014,15 @@ export default function GameCanvas({
       ctx.translate(toad.x + toad.width/2, toad.y + toad.height);
       ctx.scale(scaleX, scaleY);
 
+      // Sprite override — drawn inside the squish transform so it still squashes
+      const toadSprite = findSprite(sprites, 'toad');
+      const toadImg = toadSprite ? spriteImage(toadSprite, performance.now()) : null;
+      if (toadSprite && toadImg) {
+        ctx.drawImage(toadImg, -toadSprite.width / 2, -toadSprite.height, toadSprite.width, toadSprite.height);
+        ctx.restore();
+        return;
+      }
+
       // Main toad body
       ctx.fillStyle = toad.color;
       ctx.beginPath();
@@ -1048,6 +1072,14 @@ export default function GameCanvas({
 
       const bobY = col.y + Math.sin((s.frameId + col.bobOffset) / 10) * 3.5;
 
+      // Sprite override — keeps the bobbing motion
+      const colSprite = findSprite(sprites, col.type);
+      const colImg = colSprite ? spriteImage(colSprite, performance.now()) : null;
+      if (colSprite && colImg) {
+        ctx.drawImage(colImg, col.x - colSprite.width / 2, bobY - colSprite.height / 2, colSprite.width, colSprite.height);
+        return;
+      }
+
       if (col.type === 'banana') {
         ctx.fillStyle = '#facc15'; // yellow banana
         ctx.strokeStyle = '#ca8a04';
@@ -1090,6 +1122,12 @@ export default function GameCanvas({
     const portalX = level.endX;
     const portalY = level.endY;
 
+    const portalSprite = findSprite(sprites, 'portal');
+    const portalImg = portalSprite ? spriteImage(portalSprite, performance.now()) : null;
+    if (portalSprite && portalImg) {
+      // Sprite override — anchored to the portal's pillar base
+      drawSpriteImage(ctx, portalImg, portalX, portalY + 45, portalSprite.width, portalSprite.height, false);
+    } else {
     // Draw glowing back circle aura (Vibrant fuchsia energy)
     const outerAura = ctx.createRadialGradient(portalX, portalY, 5, portalX, portalY, 55 * pulseScale);
     outerAura.addColorStop(0, 'rgba(236, 72, 153, 0.45)');
@@ -1125,6 +1163,7 @@ export default function GameCanvas({
       ctx.stroke();
     }
     ctx.restore();
+    }
 
     // Small label reading SAFETY
     ctx.fillStyle = '#f472b6';
@@ -1132,9 +1171,17 @@ export default function GameCanvas({
     ctx.textAlign = 'center';
     ctx.fillText(t.canvasSafetyGate, portalX, portalY - 48);
 
-    // 7. Draw MOWGLI character!
+    // 7. Draw MOWGLI character! (sprite frames animate while running)
     if (s.deathTimer === 0) {
-      drawMowgli(ctx, p);
+      const mowgliSprite = findSprite(sprites, 'mowgli');
+      const mowgliImg = mowgliSprite
+        ? spriteImage(mowgliSprite, p.state === 'idle' ? null : performance.now())
+        : null;
+      if (mowgliSprite && mowgliImg) {
+        drawSpriteImage(ctx, mowgliImg, p.x + p.width / 2, p.y + p.height, mowgliSprite.width, mowgliSprite.height, p.facing === 'left');
+      } else {
+        drawMowgli(ctx, p);
+      }
     }
 
     // 8. Draw active particles
@@ -1664,6 +1711,7 @@ export default function GameCanvas({
         quiz={activeQuiz}
         fight={activeFight}
         questions={gateQuestions}
+        sprites={sprites}
         answers={puzzleAnswers}
         feedback={puzzleFeedback}
         onChoice={handlePuzzleChoice}

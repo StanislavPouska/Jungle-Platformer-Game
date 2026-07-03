@@ -33,6 +33,7 @@ export interface Platform {
   width: number;
   height: number;
   type: 'moss_log' | 'jungle_brick' | 'vine_bridge' | 'canopy_leaves';
+  spriteId?: string; // custom sprite rendering override (placed from the sprite palette)
   moving?: boolean;
   startX?: number;
   startY?: number;
@@ -218,12 +219,31 @@ export interface StealthMission extends MissionBase {
 
 export type Mission = PlatformerMission | StealthMission;
 
+// --- Sprite library: the graphical building blocks of the game. Every entity
+// the canvases draw looks its sprite up by a well-known id; a sprite with
+// uploaded frames replaces the built-in procedural art (empty frames = the
+// original hand-drawn canvas art). Custom block sprites are placeable in
+// missions as platforms.
+
+export type SpriteKind = 'block' | 'character';
+
+export interface SpriteDef {
+  id: string;
+  name: string;
+  kind: SpriteKind;
+  width: number;         // render / default placement size in world px
+  height: number;
+  frames: string[];      // uploaded images (data URLs); 2+ on a character = move animation
+  frameDuration: number; // ms per animation frame
+}
+
 /** Everything the editor authors and the game plays: the whole campaign. */
 export interface WorldData {
   missions: Mission[];
   fights: FightDef[];
   quizzes: QuizDef[];
   questionPool: PoolQuestion[];
+  sprites: SpriteDef[];
 }
 
 export interface GameSettings {

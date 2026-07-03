@@ -10,6 +10,7 @@ import {
   PlatformerMission,
   PoolQuestion,
   QuizDef,
+  SpriteDef,
   StealthMission,
   TriggerPlacement,
 } from './types';
@@ -542,6 +543,32 @@ export const INITIAL_MISSIONS: Mission[] = [
     chapter: chapterForLevelId(l.id),
     triggers: DEFAULT_TRIGGERS[l.id] ?? [],
   })),
+];
+
+// --- Sprite library -----------------------------------------------------------
+
+// Every graphical object the game draws, as an editable sprite. Frames are
+// empty by default, which means "use the original built-in canvas art" — the
+// editor's Sprites tab lets the user upload images (multiple on a character =
+// its move animation) and tune render sizes. Ids are well-known: entity code
+// looks its sprite up by these exact strings.
+export const INITIAL_SPRITES: SpriteDef[] = [
+  // Blocks (platforms, creatures, pickups, the goal)
+  { id: 'moss_log', name: 'Moss Log', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
+  { id: 'jungle_brick', name: 'Jungle Brick', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
+  { id: 'vine_bridge', name: 'Vine Bridge', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
+  { id: 'canopy_leaves', name: 'Canopy Leaves', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
+  { id: 'toad', name: 'Spring Toad', kind: 'block', width: 44, height: 24, frames: [], frameDuration: 140 },
+  { id: 'banana', name: 'Banana', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
+  { id: 'mango', name: 'Mango', kind: 'block', width: 22, height: 28, frames: [], frameDuration: 140 },
+  { id: 'star', name: 'Golden Star', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
+  { id: 'portal', name: 'Safety Portal', kind: 'block', width: 96, height: 90, frames: [], frameDuration: 140 },
+  // Characters (multiple frames = move animation)
+  { id: 'mowgli', name: 'Mowgli', kind: 'character', width: 30, height: 50, frames: [], frameDuration: 140 },
+  { id: 'baby_mowgli', name: 'Baby Mowgli', kind: 'character', width: 30, height: 20, frames: [], frameDuration: 140 },
+  { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [], frameDuration: 140 },
+  { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [], frameDuration: 140 },
+  { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [], frameDuration: 140 },
 ];
 
 export const INITIAL_SETTINGS = {

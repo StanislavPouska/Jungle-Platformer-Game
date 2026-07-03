@@ -88,3 +88,41 @@ export function makeLibraryId(prefix: string, existing: { id: string }[]): strin
   while (ids.has(id)) id = `${prefix}-${++n}`;
   return id;
 }
+
+/**
+ * Read an image file, downscale it to at most `maxW` wide, and return a data
+ * URL small enough for the localStorage save. Preserves transparency when the
+ * source has any — JPEG would flatten it to solid black. Samples every 16th
+ * pixel's alpha to decide.
+ */
+export function downscaleImage(file: File, maxW: number): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const ratio = Math.min(1, maxW / img.width);
+        const w = Math.round(img.width * ratio);
+        const h = Math.round(img.height * ratio);
+        const c = document.createElement('canvas');
+        c.width = w;
+        c.height = h;
+        const cx = c.getContext('2d');
+        if (!cx) return reject(new Error('no 2d context'));
+        cx.drawImage(img, 0, 0, w, h);
+        let hasAlpha = false;
+        try {
+          const px = cx.getImageData(0, 0, w, h).data;
+          for (let i = 3; i < px.length; i += 64) {
+            if (px[i] < 255) { hasAlpha = true; break; }
+          }
+        } catch { /* unreadable pixels — fall back to JPEG */ }
+        resolve(hasAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.82));
+      };
+      img.onerror = reject;
+      img.src = reader.result as string;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}

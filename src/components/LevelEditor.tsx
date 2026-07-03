@@ -21,7 +21,7 @@ import {
   TriggerPlacement,
   WorldData,
 } from '../types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS } from '../data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SPRITES } from '../data';
 import { Lang, UI, UIStrings } from '../i18n';
 import {
   Plus,
@@ -42,10 +42,12 @@ import {
   HelpCircle,
   Cat,
   SquarePen,
+  Image as ImageIcon,
 } from 'lucide-react';
-import { NumberField, SelectField, makeLibraryId } from './editorFields';
+import { NumberField, SelectField, makeLibraryId, downscaleImage } from './editorFields';
 import FightEditor from './FightEditor';
 import QuizEditor from './QuizEditor';
+import SpriteEditor from './SpriteEditor';
 
 // The platformer world is authored 420px tall but content can sit lower (fall
 // line ~550); the editor shows a slightly taller band so low platforms fit.
@@ -91,7 +93,8 @@ type PaletteItem =
   | { group: 'collectible'; type: Collectible['type'] }
   | { group: 'sPlatform' }
   | { group: 'spot' }
-  | { group: 'trigger'; kind: 'fight' | 'quiz' };
+  | { group: 'trigger'; kind: 'fight' | 'quiz' }
+  | { group: 'sprite'; id: string };
 
 type DragState = {
   sel: Selection;
@@ -185,7 +188,7 @@ function PaletteButton({ item, label, color, icon, armed, onToggle }: { item: Pa
           ? 'border-fuchsia-400 bg-fuchsia-950/50 ring-1 ring-fuchsia-400'
           : 'border-purple-900/50 bg-[#0c0419] hover:bg-purple-950/40'
       }`}
-      data-palette={`${item.group}${'type' in item ? '-' + item.type : ''}${'kind' in item ? '-' + item.kind : ''}`}
+      data-palette={`${item.group}${'type' in item ? '-' + item.type : ''}${'kind' in item ? '-' + item.kind : ''}${'id' in item ? '-' + item.id : ''}`}
     >
       <span className="w-4 h-4 rounded-sm flex items-center justify-center shrink-0" style={{ color }}>{icon}</span>
       <span className="text-xs text-gray-200">{label}</span>
@@ -193,7 +196,7 @@ function PaletteButton({ item, label, color, icon, armed, onToggle }: { item: Pa
   );
 }
 
-type EditorMode = 'missions' | 'fights' | 'quizzes';
+type EditorMode = 'missions' | 'fights' | 'quizzes' | 'sprites';
 
 export default function LevelEditor({ world, onWorldChange, onPlaytest, language }: LevelEditorProps) {
   const t = UI[language];
@@ -441,6 +444,22 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
           const col: Collectible = { id: makeId(m, 'c'), x: snap(wx), y: snap(wy), type: item.type, collected: false, bobOffset: Math.floor(Math.random() * 300) };
           return { ...m, collectibles: [...m.collectibles, col] };
         }
+        if (item.group === 'sprite') {
+          // Custom sprite building block: a standable platform rendered with
+          // the sprite's image, sized from the sprite's defaults.
+          const spr = world.sprites.find((s) => s.id === item.id);
+          if (!spr) return m;
+          const plat: Platform = {
+            id: makeId(m, 'p'),
+            x: snap(wx - spr.width / 2),
+            y: snap(wy - spr.height / 2),
+            width: spr.width,
+            height: spr.height,
+            type: 'canopy_leaves',
+            spriteId: spr.id,
+          };
+          return { ...m, platforms: [...m.platforms, plat] };
+        }
         return m;
       }
       // stealth
@@ -544,46 +563,13 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
     if (!window.confirm(t.editorConfirmReset)) return;
     onWorldChange(
       JSON.parse(
-        JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }),
+        JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS, sprites: INITIAL_SPRITES }),
       ),
     );
     selectMission(0);
   };
 
   // ---- background --------------------------------------------------------------
-  const downscaleImage = (file: File, maxW: number): Promise<string> =>
-    new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const img = new Image();
-        img.onload = () => {
-          const ratio = Math.min(1, maxW / img.width);
-          const w = Math.round(img.width * ratio);
-          const h = Math.round(img.height * ratio);
-          const c = document.createElement('canvas');
-          c.width = w;
-          c.height = h;
-          const cx = c.getContext('2d');
-          if (!cx) return reject(new Error('no 2d context'));
-          cx.drawImage(img, 0, 0, w, h);
-          // Preserve transparency when the source has any — JPEG would
-          // flatten it to solid black. Sample every 16th pixel's alpha.
-          let hasAlpha = false;
-          try {
-            const px = cx.getImageData(0, 0, w, h).data;
-            for (let i = 3; i < px.length; i += 64) {
-              if (px[i] < 255) { hasAlpha = true; break; }
-            }
-          } catch { /* unreadable pixels — fall back to JPEG */ }
-          resolve(hasAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.82));
-        };
-        img.onerror = reject;
-        img.src = reader.result as string;
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
   const handleBgFile = async (file: File | undefined) => {
     if (!file) return;
     const targetId = mission.id; // the upload belongs to the mission shown at pick time
@@ -605,6 +591,12 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
   const selTrigger = selected?.kind === 'trigger' ? mission.triggers.find((tr) => tr.id === selected.id) : undefined;
 
   // ---- palette descriptors ---------------------------------------------------------
+  // User-created block sprites become extra palette entries (the built-in
+  // block sprites already appear via the platform/creature/collectible groups).
+  const customBlockSprites = world.sprites.filter(
+    (s) => s.kind === 'block' && !INITIAL_SPRITES.some((d) => d.id === s.id),
+  );
+
   const platformPalette: { item: PaletteItem; label: string; color: string }[] = [
     { item: { group: 'platform', type: 'moss_log' }, label: t.palMossLog, color: PLATFORM_COLOR.moss_log },
     { item: { group: 'platform', type: 'jungle_brick' }, label: t.palBrick, color: PLATFORM_COLOR.jungle_brick },
@@ -634,6 +626,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
     { id: 'missions', label: 'editorTabMissions', icon: <SquarePen className="w-3.5 h-3.5" /> },
     { id: 'fights', label: 'editorTabFights', icon: <Swords className="w-3.5 h-3.5" /> },
     { id: 'quizzes', label: 'editorTabQuizzes', icon: <HelpCircle className="w-3.5 h-3.5" /> },
+    { id: 'sprites', label: 'editorTabSprites', icon: <ImageIcon className="w-3.5 h-3.5" /> },
   ];
 
   return (
@@ -661,6 +654,8 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
         <FightEditor world={world} onWorldChange={onWorldChange} language={language} />
       ) : mode === 'quizzes' ? (
         <QuizEditor world={world} onWorldChange={onWorldChange} language={language} />
+      ) : mode === 'sprites' ? (
+        <SpriteEditor world={world} onWorldChange={onWorldChange} language={language} />
       ) : (
       <div className="flex flex-col xl:flex-row gap-4 items-stretch">
 
@@ -730,6 +725,25 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                     </React.Fragment>
                   ))}
                 </div>
+                {customBlockSprites.length > 0 && (
+                  <>
+                    <div className="text-[10px] font-mono uppercase text-gray-500 pt-1">{t.editorGroupSprites}</div>
+                    <div className="grid grid-cols-1 gap-1.5">
+                      {customBlockSprites.map((s) => (
+                        <React.Fragment key={s.id}>
+                          <PaletteButton
+                            item={{ group: 'sprite', id: s.id }}
+                            label={s.name}
+                            color="#67e8f9"
+                            icon={s.frames.length > 0 ? <img src={s.frames[0]} alt="" className="w-4 h-4 object-contain" /> : <ImageIcon className="w-4 h-4" />}
+                            armed={isArmed({ group: 'sprite', id: s.id })}
+                            onToggle={() => toggleArmed({ group: 'sprite', id: s.id })}
+                          />
+                        </React.Fragment>
+                      ))}
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <>
@@ -791,12 +805,23 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                   {/* platforms */}
                   {mission.platforms.map((p) => {
                     const isSel = selected?.kind === 'platform' && selected.id === p.id;
+                    const sprFrame = p.spriteId
+                      ? world.sprites.find((s) => s.id === p.spriteId)?.frames[0]
+                      : undefined;
                     return (
                       <div
                         key={p.id}
                         onPointerDown={(e) => beginDrag(e, { kind: 'platform', id: p.id }, 'move')}
                         className={`absolute rounded-sm flex items-center justify-center overflow-hidden ${isSel ? 'ring-2 ring-fuchsia-400 z-20' : 'z-10'}`}
-                        style={{ left: p.x * SCALE, top: p.y * SCALE, width: p.width * SCALE, height: p.height * SCALE, background: PLATFORM_COLOR[p.type], opacity: p.moving ? 0.85 : 1, cursor: 'move' }}
+                        style={{
+                          left: p.x * SCALE,
+                          top: p.y * SCALE,
+                          width: p.width * SCALE,
+                          height: p.height * SCALE,
+                          background: sprFrame ? `center / 100% 100% no-repeat url(${JSON.stringify(sprFrame)})` : PLATFORM_COLOR[p.type],
+                          opacity: p.moving ? 0.85 : 1,
+                          cursor: 'move',
+                        }}
                         data-item="platform"
                         data-id={p.id}
                       >

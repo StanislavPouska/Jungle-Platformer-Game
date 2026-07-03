@@ -4,11 +4,12 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { StealthMission, StepPlatform, HidingSpot, TriggerPlacement, FightDef, PoolQuestion, QuizDef } from '../types';
+import { StealthMission, StepPlatform, HidingSpot, TriggerPlacement, FightDef, PoolQuestion, QuizDef, SpriteDef } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, RotateCcw, Play } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
+import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
@@ -59,6 +60,7 @@ interface StealthCanvasProps {
   fights: FightDef[];
   quizzes: QuizDef[];
   questionPool: PoolQuestion[];
+  sprites: SpriteDef[];
   language: Lang;
   onComplete: () => void;
   paused: boolean;
@@ -70,6 +72,7 @@ export default function StealthCanvas({
   fights,
   quizzes,
   questionPool,
+  sprites,
   language,
   onComplete,
   paused,
@@ -419,7 +422,7 @@ export default function StealthCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [prologue, paused, escaped, activeTrigger, questionPool]);
+  }, [prologue, paused, escaped, activeTrigger, questionPool, sprites]);
 
   // ---- trigger gate resolutions ---------------------------------------------
   const closeGate = () => {
@@ -663,6 +666,14 @@ export default function StealthCanvas({
   };
 
   const drawToddler = (ctx: CanvasRenderingContext2D, p: typeof stateRef.current.player) => {
+    // Sprite override — frames animate while crawling
+    const spr = findSprite(sprites, 'baby_mowgli');
+    const img = spr ? spriteImage(spr, Math.abs(p.vx) > 0.1 ? performance.now() : null) : null;
+    if (spr && img) {
+      drawSpriteImage(ctx, img, p.x + PLAYER_W / 2, p.y + 2, spr.width, spr.height, p.facing === 'left');
+      return;
+    }
+
     ctx.save();
     ctx.translate(p.x + PLAYER_W / 2, p.y - PLAYER_H / 2);
     if (p.facing === 'left') ctx.scale(-1, 1);
@@ -715,6 +726,14 @@ export default function StealthCanvas({
     const tiger = s.tiger;
     const sniffing = s.sequence.active && s.sequence.phase === 'sniff';
     const wiggle = sniffing ? Math.sin((s.frameId ?? 0) / 4) * 3 : 0;
+
+    // Sprite override — the prowl is always in motion, so always animate
+    const spr = findSprite(sprites, 'tiger');
+    const img = spr ? spriteImage(spr, performance.now()) : null;
+    if (spr && img) {
+      drawSpriteImage(ctx, img, tiger.x + wiggle, tiger.y + 14, spr.width, spr.height, tiger.dir < 0);
+      return;
+    }
 
     ctx.save();
     ctx.translate(tiger.x + wiggle, tiger.y);
@@ -906,6 +925,7 @@ export default function StealthCanvas({
         quiz={activeQuiz}
         questions={gateQuestions}
         fight={activeFight}
+        sprites={sprites}
         answers={puzzleAnswers}
         feedback={puzzleFeedback}
         onChoice={handlePuzzleChoice}

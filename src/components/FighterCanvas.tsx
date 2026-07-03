@@ -4,10 +4,11 @@
  */
 
 import React, { useEffect, useRef, useState } from 'react';
-import { FightDef, FighterSpriteId } from '../types';
+import { FightDef, FighterSpriteId, SpriteDef } from '../types';
 import { audioSynth } from '../audio';
 import { Landmark, Swords, Play } from 'lucide-react';
 import { Lang, UI } from '../i18n';
+import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
 
 // --- Arena geometry (fixed single screen, no scroll). The arena is authored
 // in a 420-tall world (Mowgli ~1/3 of it) and rendered scaled up to the
@@ -56,6 +57,7 @@ interface FireParticle {
 
 interface FighterCanvasProps {
   fight: FightDef;
+  sprites: SpriteDef[];
   language: Lang;
   onComplete: () => void;
   // Called on defeat when fight.restartOnLose is false — the host decides
@@ -76,6 +78,7 @@ const makeFighter = (sprite: FighterSpriteId, maxHp: number, damage: number, par
 
 export default function FighterCanvas({
   fight,
+  sprites,
   language,
   onComplete,
   onLose,
@@ -308,7 +311,7 @@ export default function FighterCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [fight, paused, won]);
+  }, [fight, paused, won, sprites]);
 
   // Advance an attacker's state machine; resolve a single hit on strike entry.
   const advanceAttack = (self: FighterState, other: FighterState, selfIsPlayer: boolean, dt: number, s: typeof stateRef.current) => {
@@ -467,6 +470,17 @@ export default function FighterCanvas({
   };
 
   const drawFighter = (ctx: CanvasRenderingContext2D, f: FighterState, s: typeof stateRef.current) => {
+    // Sprite override — frames animate continuously; keep the hurt flash
+    const spr = findSprite(sprites, f.sprite);
+    const img = spr ? spriteImage(spr, performance.now()) : null;
+    if (spr && img) {
+      const flash = f.hurtFlash > 0 && Math.floor(s.tick / 2) % 2 === 0;
+      ctx.save();
+      if (flash) ctx.globalAlpha = 0.5;
+      drawSpriteImage(ctx, img, f.x, GROUND_Y, spr.width, spr.height, f.facing === -1);
+      ctx.restore();
+      return;
+    }
     if (f.sprite === 'shere_khan') drawShereKhan(ctx, f, s);
     else drawMowgliMan(ctx, f, s);
   };
