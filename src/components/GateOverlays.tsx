@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { TriggerPlacement, FightDef, PoolQuestion, QuizDef } from '../types';
+import { TriggerPlacement, FightDef, PoolQuestion, QuizDef, SpriteDef } from '../types';
 import { Lang, UI, getQuizText, getQuestionText, getFightText } from '../i18n';
 import FighterCanvas from './FighterCanvas';
 import ChapterCard from './ChapterCard';
@@ -19,6 +19,7 @@ interface GateOverlaysProps {
   quiz: QuizDef | null;   // resolved library object when trigger.kind === 'quiz'
   questions: PoolQuestion[]; // the pool questions drawn for this gate opening
   fight: FightDef | null; // resolved library object when trigger.kind === 'fight'
+  sprites: SpriteDef[];   // sprite library, passed through to the fight arena
   answers: number[];
   feedback: 'idle' | 'wrong';
   onChoice: (questionIdx: number, choiceIdx: number) => void;
@@ -37,6 +38,7 @@ export default function GateOverlays({
   quiz,
   questions,
   fight,
+  sprites,
   answers,
   feedback,
   onChoice,
@@ -122,6 +124,7 @@ export default function GateOverlays({
       <div className="absolute inset-0 z-30 bg-slate-950 overflow-y-auto" id="mission-fight-overlay">
         <FighterCanvas
           fight={fight}
+          sprites={sprites}
           language={language}
           label={getFightText(fight, language).name}
           onComplete={onFightWin}

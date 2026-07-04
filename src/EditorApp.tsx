@@ -5,7 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { WorldData } from './types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS } from './data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SPRITES } from './data';
 import LevelEditor from './components/LevelEditor';
 import { Lang, UI, LANGUAGES } from './i18n';
 import {
@@ -25,7 +25,7 @@ import { SquarePen } from 'lucide-react';
 function seedWorld(): WorldData {
   const saved = readSaveData();
   if (!saved?.world?.missions?.length) {
-    return JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }));
+    return JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS, sprites: INITIAL_SPRITES }));
   }
   return mergeWithDefaults(saved.world, saved.knownDefaults);
 }

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SETTINGS } from './data';
+import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SPRITES, INITIAL_SETTINGS } from './data';
 import { GameStats, GameSettings, WorldData, ChapterId } from './types';
 import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
@@ -39,7 +39,7 @@ import {
 } from './storage';
 
 const initialWorld = (): WorldData =>
-  JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS }));
+  JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS, sprites: INITIAL_SPRITES }));
 
 export default function App() {
   const [world, setWorld] = useState<WorldData>(initialWorld);
@@ -563,6 +563,7 @@ export default function App() {
                   fights={world.fights}
                   quizzes={world.quizzes}
                   questionPool={world.questionPool}
+                  sprites={world.sprites}
                   language={language}
                   onComplete={handleNextLevel}
                   paused={isPausedByMenu}
@@ -574,6 +575,7 @@ export default function App() {
                   fights={world.fights}
                   quizzes={world.quizzes}
                   questionPool={world.questionPool}
+                  sprites={world.sprites}
                   settings={settings}
                   stats={stats}
                   onStatsChange={setStats}

@@ -35,11 +35,12 @@ export const LEVEL_BACKGROUNDS: Record<
 const cache: Record<string, HTMLImageElement> = {};
 let started = false;
 
-// Separate cache for level-editor custom backgrounds supplied as data URLs.
+// Separate cache for data-URL images (custom backgrounds + sprite frames).
 // Bounded: superseded uploads would otherwise pile up as decoded images for
 // the life of the page. Map iteration order gives us oldest-first eviction.
+// Sized for a full sprite set (several characters × several frames each).
 const dataUrlCache = new Map<string, HTMLImageElement>();
-const DATA_URL_CACHE_MAX = 8;
+const DATA_URL_CACHE_MAX = 96;
 
 /** Kick off loading of every asset. Safe to call repeatedly. */
 export function preloadAssets(): void {
