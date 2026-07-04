@@ -560,10 +560,15 @@ export default function StealthCanvas({
     ctx.save();
     ctx.translate(-s.cameraX, -s.cameraY);
 
-    // Ground step platforms
+    // Ground step platforms — "extend to bottom" fills all the way down to
+    // the lower screen edge; the default is the short 60px earth skirt.
+    const screenBottomW = s.cameraY + canvas.height;
     prologue.platforms.forEach((plat) => {
+      const fillBottom = plat.extendDown
+        ? Math.max(plat.y + plat.height + 60, screenBottomW)
+        : plat.y + plat.height + 60;
       ctx.fillStyle = '#3f2a18';
-      ctx.fillRect(plat.x, plat.y, plat.width, plat.height + 60);
+      ctx.fillRect(plat.x, plat.y, plat.width, fillBottom - plat.y);
       ctx.fillStyle = '#1f5132';
       ctx.fillRect(plat.x, plat.y, plat.width, 8);
     });

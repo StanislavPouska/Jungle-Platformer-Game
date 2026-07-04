@@ -33,7 +33,9 @@ export interface Platform {
   width: number;
   height: number;
   type: 'moss_log' | 'jungle_brick' | 'vine_bridge' | 'canopy_leaves';
-  spriteId?: string; // custom sprite rendering override (placed from the sprite palette)
+  spriteId?: string;    // custom sprite rendering override (placed from the sprite palette)
+  extendDown?: boolean; // visually extend to the bottom of the screen (grounded look);
+                        // unset = the historical default: non-moving logs/bricks extend
   moving?: boolean;
   startX?: number;
   startY?: number;
@@ -93,6 +95,7 @@ export interface StepPlatform {
   width: number;
   y: number; // ground surface the player/tiger walk on
   height: number; // visual thickness; also the max climbable step delta
+  extendDown?: boolean; // fill down to the bottom of the screen (default: a short 60px skirt)
 }
 
 export interface HidingSpot {

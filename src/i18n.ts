@@ -303,6 +303,8 @@ export const UI = {
     editorSpriteNoFrames: 'No images uploaded — the original built-in art is used.',
     editorGroupSprites: 'Custom sprites',
     editorSpriteNewName: 'New Sprite',
+    editorFieldExtendDown: 'Extend to bottom',
+    editorExtendDownHint: 'Stretches the block down to the lower screen edge (with an image, its bottom 20% is stretched).',
 
     editorUsedBy: 'Placed in',
     editorCascadeConfirm1: 'This object is launched by triggers in: ',
@@ -598,6 +600,8 @@ export const UI = {
     editorSpriteNoFrames: 'Žádné obrázky — použije se původní vestavěná grafika.',
     editorGroupSprites: 'Vlastní sprity',
     editorSpriteNewName: 'Nový Sprite',
+    editorFieldExtendDown: 'Protáhnout ke dnu',
+    editorExtendDownHint: 'Protáhne blok až ke spodnímu okraji obrazovky (u obrázku se roztáhne jeho spodních 20 %).',
 
     editorUsedBy: 'Umístěno v',
     editorCascadeConfirm1: 'Tento objekt spouštějí spouštěče v: ',

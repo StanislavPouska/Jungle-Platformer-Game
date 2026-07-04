@@ -23,7 +23,7 @@ import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
-import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
+import { findSprite, spriteImage, drawSpriteImage, platformExtendsDown } from '../sprites';
 import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
@@ -884,9 +884,16 @@ export default function GameCanvas({
       const dx = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
       const dw = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
 
-      // Solid ground (logs & bricks) extends straight down to the lower edge of
-      // the screen so the bottom platforms look grounded, not floating.
-      if (!plat.moving && (plat.type === 'moss_log' || plat.type === 'jungle_brick')) {
+      // Sprite override: a custom placed sprite, or an uploaded image on the
+      // platform's built-in type sprite, replaces the procedural texture.
+      const platSprite = findSprite(sprites, plat.spriteId) ?? findSprite(sprites, plat.type);
+      const platImg = platSprite ? spriteImage(platSprite, performance.now()) : null;
+      const extendsDown = platformExtendsDown(plat);
+
+      // "Extend to bottom": the platform reaches the lower edge of the screen
+      // so it looks grounded, not floating. With a sprite image the bottom 20%
+      // of the image is stretched downward; otherwise an earth column is drawn.
+      if (extendsDown && !platImg) {
         const colTop = plat.y + 6;
         if (screenBottomW > colTop) {
           const earth = ctx.createLinearGradient(0, colTop, 0, screenBottomW);
@@ -897,15 +904,20 @@ export default function GameCanvas({
         }
       }
 
-      // Sprite override: a custom placed sprite, or an uploaded image on the
-      // platform's built-in type sprite, replaces the procedural texture.
-      const platSprite = findSprite(sprites, plat.spriteId) ?? findSprite(sprites, plat.type);
-      if (platSprite) {
-        const img = spriteImage(platSprite, performance.now());
-        if (img) {
-          ctx.drawImage(img, dx, plat.y, dw, plat.height);
-          return;
+      if (platImg) {
+        ctx.drawImage(platImg, dx, plat.y, dw, plat.height);
+        if (extendsDown) {
+          const top = plat.y + plat.height;
+          if (screenBottomW > top) {
+            const sliceH = Math.max(1, Math.floor(platImg.naturalHeight * 0.2));
+            ctx.drawImage(
+              platImg,
+              0, platImg.naturalHeight - sliceH, platImg.naturalWidth, sliceH,
+              dx, top, dw, screenBottomW - top,
+            );
+          }
         }
+        return;
       }
 
       // Platform moss pattern textures

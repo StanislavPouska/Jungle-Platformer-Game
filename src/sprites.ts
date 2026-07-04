@@ -3,8 +3,18 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { SpriteDef } from './types';
+import { Platform, SpriteDef } from './types';
 import { getImageFromDataUrl } from './assets';
+
+/**
+ * Whether a platformer platform visually extends down to the bottom of the
+ * screen. Explicit `extendDown` wins; unset falls back to the historical
+ * rule (non-moving logs and bricks look grounded, everything else floats).
+ * Shared by the game renderer and the editor preview so they always agree.
+ */
+export function platformExtendsDown(plat: Platform): boolean {
+  return plat.extendDown ?? (!plat.moving && (plat.type === 'moss_log' || plat.type === 'jungle_brick'));
+}
 
 /**
  * Look a sprite up by id, but only when it actually has uploaded frames —

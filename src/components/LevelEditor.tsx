@@ -45,6 +45,7 @@ import {
   Image as ImageIcon,
 } from 'lucide-react';
 import { NumberField, SelectField, makeLibraryId, downscaleImage } from './editorFields';
+import { platformExtendsDown } from '../sprites';
 import FightEditor from './FightEditor';
 import QuizEditor from './QuizEditor';
 import SpriteEditor from './SpriteEditor';
@@ -809,8 +810,23 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                       ? world.sprites.find((s) => s.id === p.spriteId)?.frames[0]
                       : undefined;
                     return (
+                      <React.Fragment key={p.id}>
+                      {platformExtendsDown(p) && (
+                        // preview of "extend to bottom" (decoration — no clicks)
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{
+                            left: p.x * SCALE,
+                            top: (p.y + p.height) * SCALE,
+                            width: p.width * SCALE,
+                            height: Math.max(0, VIEWPORT_H - (p.y + p.height) * SCALE),
+                            background: sprFrame ? `bottom / 100% 500% no-repeat url(${JSON.stringify(sprFrame)})` : PLATFORM_COLOR[p.type],
+                            opacity: 0.35,
+                          }}
+                          data-extension={p.id}
+                        />
+                      )}
                       <div
-                        key={p.id}
                         onPointerDown={(e) => beginDrag(e, { kind: 'platform', id: p.id }, 'move')}
                         className={`absolute rounded-sm flex items-center justify-center overflow-hidden ${isSel ? 'ring-2 ring-fuchsia-400 z-20' : 'z-10'}`}
                         style={{
@@ -834,6 +850,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                           />
                         )}
                       </div>
+                      </React.Fragment>
                     );
                   })}
 
@@ -896,8 +913,23 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                   {mission.platforms.map((p) => {
                     const isSel = selected?.kind === 'sPlatform' && selected.id === p.id;
                     return (
+                      <React.Fragment key={p.id}>
+                      {p.extendDown && (
+                        // preview of "extend to bottom" (decoration — no clicks)
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{
+                            left: p.x * SCALE,
+                            top: (p.y + p.height) * SCALE,
+                            width: p.width * SCALE,
+                            height: Math.max(0, VIEWPORT_H - (p.y + p.height) * SCALE),
+                            background: '#3f2a18',
+                            opacity: 0.35,
+                          }}
+                          data-extension={p.id}
+                        />
+                      )}
                       <div
-                        key={p.id}
                         onPointerDown={(e) => beginDrag(e, { kind: 'sPlatform', id: p.id }, 'move')}
                         className={`absolute rounded-sm overflow-hidden ${isSel ? 'ring-2 ring-fuchsia-400 z-20' : 'z-10'}`}
                         style={{ left: p.x * SCALE, top: p.y * SCALE, width: p.width * SCALE, height: p.height * SCALE, background: '#3f2a18', borderTop: '3px solid #1f5132', cursor: 'move' }}
@@ -912,6 +944,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                           />
                         )}
                       </div>
+                      </React.Fragment>
                     );
                   })}
 
@@ -1029,6 +1062,18 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                     <NumberField label={t.editorFieldSpeed} value={selPlatform.speed ?? 2} step={0.5} onChange={(v) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, speed: v } : p)) } : m))} />
                   </div>
                 )}
+                {!selPlatform.moving && (
+                  <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendDownHint}>
+                    <input
+                      type="checkbox"
+                      checked={platformExtendsDown(selPlatform)}
+                      onChange={(e) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, extendDown: e.target.checked } : p)) } : m))}
+                      className="accent-fuchsia-500 w-3.5 h-3.5"
+                      id="editor-extend-down"
+                    />
+                    <span className="text-[11px] text-gray-300">{t.editorFieldExtendDown}</span>
+                  </label>
+                )}
                 <button onClick={() => { updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.filter((p) => p.id !== selPlatform.id) } : m)); setSelected(null); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 text-[11px] cursor-pointer">
                   <Trash2 className="w-3.5 h-3.5" />{t.editorDeleteItem}
                 </button>
@@ -1080,6 +1125,16 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                   <NumberField label={t.editorFieldWidth} value={selSPlatform.width} onChange={(v) => resizeItem(selected!, Math.max(GRID, v), selSPlatform.height)} />
                   <NumberField label={t.editorFieldHeight} value={selSPlatform.height} onChange={(v) => resizeItem(selected!, selSPlatform.width, Math.max(GRID, v))} />
                 </div>
+                <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendDownHint}>
+                  <input
+                    type="checkbox"
+                    checked={!!selSPlatform.extendDown}
+                    onChange={(e) => updateMission((m) => (m.type === 'stealth' ? { ...m, platforms: m.platforms.map((p) => (p.id === selSPlatform.id ? { ...p, extendDown: e.target.checked } : p)) } : m))}
+                    className="accent-fuchsia-500 w-3.5 h-3.5"
+                    id="editor-extend-down-stealth"
+                  />
+                  <span className="text-[11px] text-gray-300">{t.editorFieldExtendDown}</span>
+                </label>
                 <button onClick={() => { updateMission((m) => (m.type === 'stealth' ? { ...m, platforms: m.platforms.filter((p) => p.id !== selSPlatform.id) } : m)); setSelected(null); }} disabled={mission.type === 'stealth' && mission.platforms.length <= 1} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 text-[11px] cursor-pointer disabled:opacity-40">
                   <Trash2 className="w-3.5 h-3.5" />{t.editorDeleteItem}
                 </button>
