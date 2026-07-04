@@ -826,6 +826,20 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                           data-extension={p.id}
                         />
                       )}
+                      {!p.moving && p.extendLeft && (
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{ left: 0, top: p.y * SCALE, width: p.x * SCALE, height: p.height * SCALE, background: sprFrame ? `left / auto 100% no-repeat url(${JSON.stringify(sprFrame)})` : PLATFORM_COLOR[p.type], opacity: 0.35 }}
+                          data-extension-left={p.id}
+                        />
+                      )}
+                      {!p.moving && p.extendRight && (
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{ left: (p.x + p.width) * SCALE, top: p.y * SCALE, width: Math.max(0, (worldW - p.x - p.width) * SCALE), height: p.height * SCALE, background: sprFrame ? `right / auto 100% no-repeat url(${JSON.stringify(sprFrame)})` : PLATFORM_COLOR[p.type], opacity: 0.35 }}
+                          data-extension-right={p.id}
+                        />
+                      )}
                       <div
                         onPointerDown={(e) => beginDrag(e, { kind: 'platform', id: p.id }, 'move')}
                         className={`absolute rounded-sm flex items-center justify-center overflow-hidden ${isSel ? 'ring-2 ring-fuchsia-400 z-20' : 'z-10'}`}
@@ -927,6 +941,20 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                             opacity: 0.35,
                           }}
                           data-extension={p.id}
+                        />
+                      )}
+                      {p.extendLeft && (
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{ left: 0, top: p.y * SCALE, width: p.x * SCALE, height: p.height * SCALE, background: '#3f2a18', opacity: 0.35 }}
+                          data-extension-left={p.id}
+                        />
+                      )}
+                      {p.extendRight && (
+                        <div
+                          className="absolute pointer-events-none z-0"
+                          style={{ left: (p.x + p.width) * SCALE, top: p.y * SCALE, width: Math.max(0, (worldW - p.x - p.width) * SCALE), height: p.height * SCALE, background: '#3f2a18', opacity: 0.35 }}
+                          data-extension-right={p.id}
                         />
                       )}
                       <div
@@ -1063,16 +1091,38 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                   </div>
                 )}
                 {!selPlatform.moving && (
-                  <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendDownHint}>
-                    <input
-                      type="checkbox"
-                      checked={platformExtendsDown(selPlatform)}
-                      onChange={(e) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, extendDown: e.target.checked } : p)) } : m))}
-                      className="accent-fuchsia-500 w-3.5 h-3.5"
-                      id="editor-extend-down"
-                    />
-                    <span className="text-[11px] text-gray-300">{t.editorFieldExtendDown}</span>
-                  </label>
+                  <>
+                    <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendDownHint}>
+                      <input
+                        type="checkbox"
+                        checked={platformExtendsDown(selPlatform)}
+                        onChange={(e) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, extendDown: e.target.checked } : p)) } : m))}
+                        className="accent-fuchsia-500 w-3.5 h-3.5"
+                        id="editor-extend-down"
+                      />
+                      <span className="text-[11px] text-gray-300">{t.editorFieldExtendDown}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendSideHint}>
+                      <input
+                        type="checkbox"
+                        checked={!!selPlatform.extendLeft}
+                        onChange={(e) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, extendLeft: e.target.checked } : p)) } : m))}
+                        className="accent-fuchsia-500 w-3.5 h-3.5"
+                        id="editor-extend-left"
+                      />
+                      <span className="text-[11px] text-gray-300">{t.editorFieldExtendLeft}</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendSideHint}>
+                      <input
+                        type="checkbox"
+                        checked={!!selPlatform.extendRight}
+                        onChange={(e) => updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.map((p) => (p.id === selPlatform.id ? { ...p, extendRight: e.target.checked } : p)) } : m))}
+                        className="accent-fuchsia-500 w-3.5 h-3.5"
+                        id="editor-extend-right"
+                      />
+                      <span className="text-[11px] text-gray-300">{t.editorFieldExtendRight}</span>
+                    </label>
+                  </>
                 )}
                 <button onClick={() => { updateMission((m) => (m.type === 'platformer' ? { ...m, platforms: m.platforms.filter((p) => p.id !== selPlatform.id) } : m)); setSelected(null); }} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 text-[11px] cursor-pointer">
                   <Trash2 className="w-3.5 h-3.5" />{t.editorDeleteItem}
@@ -1134,6 +1184,26 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                     id="editor-extend-down-stealth"
                   />
                   <span className="text-[11px] text-gray-300">{t.editorFieldExtendDown}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendSideHint}>
+                  <input
+                    type="checkbox"
+                    checked={!!selSPlatform.extendLeft}
+                    onChange={(e) => updateMission((m) => (m.type === 'stealth' ? { ...m, platforms: m.platforms.map((p) => (p.id === selSPlatform.id ? { ...p, extendLeft: e.target.checked } : p)) } : m))}
+                    className="accent-fuchsia-500 w-3.5 h-3.5"
+                    id="editor-extend-left-stealth"
+                  />
+                  <span className="text-[11px] text-gray-300">{t.editorFieldExtendLeft}</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer" title={t.editorExtendSideHint}>
+                  <input
+                    type="checkbox"
+                    checked={!!selSPlatform.extendRight}
+                    onChange={(e) => updateMission((m) => (m.type === 'stealth' ? { ...m, platforms: m.platforms.map((p) => (p.id === selSPlatform.id ? { ...p, extendRight: e.target.checked } : p)) } : m))}
+                    className="accent-fuchsia-500 w-3.5 h-3.5"
+                    id="editor-extend-right-stealth"
+                  />
+                  <span className="text-[11px] text-gray-300">{t.editorFieldExtendRight}</span>
                 </label>
                 <button onClick={() => { updateMission((m) => (m.type === 'stealth' ? { ...m, platforms: m.platforms.filter((p) => p.id !== selSPlatform.id) } : m)); setSelected(null); }} disabled={mission.type === 'stealth' && mission.platforms.length <= 1} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-md bg-rose-900/40 hover:bg-rose-800/50 border border-rose-700/40 text-rose-200 text-[11px] cursor-pointer disabled:opacity-40">
                   <Trash2 className="w-3.5 h-3.5" />{t.editorDeleteItem}

@@ -305,6 +305,9 @@ export const UI = {
     editorSpriteNewName: 'New Sprite',
     editorFieldExtendDown: 'Extend to bottom',
     editorExtendDownHint: 'Stretches the block down to the lower screen edge (with an image, its bottom 20% is stretched).',
+    editorFieldExtendLeft: 'Extend left',
+    editorFieldExtendRight: 'Extend right',
+    editorExtendSideHint: 'Stretches the block to that side of the level so no edge gap shows (with an image, its outer 20% is stretched).',
 
     editorUsedBy: 'Placed in',
     editorCascadeConfirm1: 'This object is launched by triggers in: ',
@@ -602,6 +605,9 @@ export const UI = {
     editorSpriteNewName: 'Nový Sprite',
     editorFieldExtendDown: 'Protáhnout ke dnu',
     editorExtendDownHint: 'Protáhne blok až ke spodnímu okraji obrazovky (u obrázku se roztáhne jeho spodních 20 %).',
+    editorFieldExtendLeft: 'Protáhnout doleva',
+    editorFieldExtendRight: 'Protáhnout doprava',
+    editorExtendSideHint: 'Protáhne blok k danému okraji úrovně, aby na kraji nevznikla mezera (u obrázku se roztáhne krajních 20 %).',
 
     editorUsedBy: 'Umístěno v',
     editorCascadeConfirm1: 'Tento objekt spouštějí spouštěče v: ',

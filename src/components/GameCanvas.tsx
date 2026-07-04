@@ -881,8 +881,16 @@ export default function GameCanvas({
       // Level 1: the platform at the very end of the level extends to both the
       // left and right edges of the screen once the camera reaches the end.
       const isEndPlatform = level.id === 1 && plat.x + plat.width >= level.endX - 40;
-      const dx = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
-      const dw = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
+      const baseX = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
+      const baseW = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
+
+      // "Extend left/right": visually stretch the block to the level's camera
+      // bounds (0 / endX+350) so no gap shows at the level's start or end.
+      const extendLeft = !plat.moving && !!plat.extendLeft;
+      const extendRight = !plat.moving && !!plat.extendRight;
+      const dx = extendLeft ? Math.min(baseX, 0) : baseX;
+      const dRight = extendRight ? Math.max(baseX + baseW, s.levelLength) : baseX + baseW;
+      const dw = dRight - dx;
 
       // Sprite override: a custom placed sprite, or an uploaded image on the
       // platform's built-in type sprite, replaces the procedural texture.
@@ -905,16 +913,23 @@ export default function GameCanvas({
       }
 
       if (platImg) {
-        ctx.drawImage(platImg, dx, plat.y, dw, plat.height);
+        const W = platImg.naturalWidth;
+        const H = platImg.naturalHeight;
+        // Body keeps its authored proportions; side extensions stretch the
+        // image's outer 20% slices toward the level bounds.
+        const sliceW = Math.max(1, Math.floor(W * 0.2));
+        if (dx < baseX) {
+          ctx.drawImage(platImg, 0, 0, sliceW, H, dx, plat.y, baseX - dx, plat.height);
+        }
+        if (dRight > baseX + baseW) {
+          ctx.drawImage(platImg, W - sliceW, 0, sliceW, H, baseX + baseW, plat.y, dRight - (baseX + baseW), plat.height);
+        }
+        ctx.drawImage(platImg, baseX, plat.y, baseW, plat.height);
         if (extendsDown) {
           const top = plat.y + plat.height;
           if (screenBottomW > top) {
-            const sliceH = Math.max(1, Math.floor(platImg.naturalHeight * 0.2));
-            ctx.drawImage(
-              platImg,
-              0, platImg.naturalHeight - sliceH, platImg.naturalWidth, sliceH,
-              dx, top, dw, screenBottomW - top,
-            );
+            const sliceH = Math.max(1, Math.floor(H * 0.2));
+            ctx.drawImage(platImg, 0, H - sliceH, W, sliceH, dx, top, dw, screenBottomW - top);
           }
         }
         return;

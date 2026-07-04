@@ -36,6 +36,8 @@ export interface Platform {
   spriteId?: string;    // custom sprite rendering override (placed from the sprite palette)
   extendDown?: boolean; // visually extend to the bottom of the screen (grounded look);
                         // unset = the historical default: non-moving logs/bricks extend
+  extendLeft?: boolean;  // visually extend to the level's left screen bound (x = 0)
+  extendRight?: boolean; // visually extend to the level's right screen bound (endX + 350)
   moving?: boolean;
   startX?: number;
   startY?: number;
@@ -95,7 +97,9 @@ export interface StepPlatform {
   width: number;
   y: number; // ground surface the player/tiger walk on
   height: number; // visual thickness; also the max climbable step delta
-  extendDown?: boolean; // fill down to the bottom of the screen (default: a short 60px skirt)
+  extendDown?: boolean;  // fill down to the bottom of the screen (default: a short 60px skirt)
+  extendLeft?: boolean;  // fill to the level's left screen bound (x = 0)
+  extendRight?: boolean; // fill to the level's right screen bound (levelMaxX + 200)
 }
 
 export interface HidingSpot {
