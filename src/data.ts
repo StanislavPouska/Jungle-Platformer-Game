@@ -558,17 +558,19 @@ export const INITIAL_SPRITES: SpriteDef[] = [
   { id: 'jungle_brick', name: 'Jungle Brick', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
   { id: 'vine_bridge', name: 'Vine Bridge', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
   { id: 'canopy_leaves', name: 'Canopy Leaves', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
-  { id: 'toad', name: 'Spring Toad', kind: 'block', width: 44, height: 24, frames: [], frameDuration: 140 },
+  { id: 'toad', name: 'Spring Toad', kind: 'block', width: 44, height: 24, frames: ['/assets/sprites/toad-1.png', '/assets/sprites/toad-2.png'], frameDuration: 320 },
   { id: 'banana', name: 'Banana', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
   { id: 'mango', name: 'Mango', kind: 'block', width: 22, height: 28, frames: [], frameDuration: 140 },
   { id: 'star', name: 'Golden Star', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
   { id: 'portal', name: 'Safety Portal', kind: 'block', width: 96, height: 90, frames: [], frameDuration: 140 },
-  // Characters (multiple frames = move animation)
-  { id: 'mowgli', name: 'Mowgli', kind: 'character', width: 30, height: 50, frames: [], frameDuration: 140 },
-  { id: 'baby_mowgli', name: 'Baby Mowgli', kind: 'character', width: 30, height: 20, frames: [], frameDuration: 140 },
-  { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [], frameDuration: 140 },
-  { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [], frameDuration: 140 },
-  { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [], frameDuration: 140 },
+  // Characters (multiple frames = move animation; frame 1 doubles as the idle
+  // pose). Bundled art lives in public/assets/sprites — replaceable per sprite
+  // in the editor's Sprites tab.
+  { id: 'mowgli', name: 'Mowgli', kind: 'character', width: 30, height: 50, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/mowgli-${n}.png`), frameDuration: 110 },
+  { id: 'baby_mowgli', name: 'Baby Mowgli', kind: 'character', width: 30, height: 20, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/baby-mowgli-${n}.png`), frameDuration: 130 },
+  { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/tiger-${n}.png`), frameDuration: 160 },
+  { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/mowgli-torch-${n}.png`), frameDuration: 170 },
+  { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/shere-khan-${n}.png`), frameDuration: 170 },
 ];
 
 export const INITIAL_SETTINGS = {

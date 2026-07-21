@@ -35,12 +35,41 @@ export interface KnownDefaults {
 }
 
 export interface SaveData {
+  version: 5;
+  stats: GameStats;
+  settings: GameSettings;
+  world: WorldData;
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+// --- v4 legacy shape (sprite library existed, but no bundled default art) -----
+
+interface SaveDataV4 {
   version: 4;
   stats: GameStats;
   settings: GameSettings;
   world: WorldData;
   savedAt: string;
   knownDefaults?: KnownDefaults;
+}
+
+/**
+ * One-time stamp of the bundled default art onto sprites that still have no
+ * frames. v4-era sprites with empty frames all rendered as procedural canvas
+ * art — the bundled PNGs are the new default look for exactly those. Runs only
+ * during migration, so frames a user deletes in the editor afterwards stay
+ * deleted.
+ */
+function migrateV4(v4: SaveDataV4): SaveData {
+  const sprites = (v4.world.sprites ?? []).map((s) => {
+    if (s.frames.length > 0) return s;
+    const def = INITIAL_SPRITES.find((d) => d.id === s.id);
+    return def && def.frames.length > 0
+      ? { ...s, frames: [...def.frames], frameDuration: def.frameDuration }
+      : s;
+  });
+  return { ...v4, version: 5, world: { ...v4.world, sprites } };
 }
 
 // --- v3 legacy shape (no sprite library yet) ----------------------------------
@@ -55,7 +84,7 @@ interface SaveDataV3 {
 }
 
 /** Add the sprite library: pre-sprite saves simply get the built-in set. */
-function migrateV3(v3: SaveDataV3): SaveData {
+function migrateV3(v3: SaveDataV3): SaveDataV4 {
   return {
     ...v3,
     version: 4,
@@ -251,11 +280,12 @@ export function readSaveData(): SaveData | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveData | SaveDataV3 | SaveDataV2 | SaveDataV1;
-    if ('version' in parsed && parsed.version === 4 && parsed.world) return parsed;
-    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV3(parsed);
-    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV3(migrateV2(parsed));
-    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV3(migrateV1(parsed));
+    const parsed = JSON.parse(raw) as SaveData | SaveDataV4 | SaveDataV3 | SaveDataV2 | SaveDataV1;
+    if ('version' in parsed && parsed.version === 5 && parsed.world) return parsed;
+    if ('version' in parsed && parsed.version === 4 && parsed.world) return migrateV4(parsed);
+    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV4(migrateV3(parsed));
+    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV4(migrateV3(migrateV2(parsed)));
+    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV4(migrateV3(migrateV1(parsed)));
     return null;
   } catch {
     return null;
@@ -340,7 +370,7 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
 export function writeSaveData(data: Omit<SaveData, 'version' | 'knownDefaults'>): SaveData | null {
   const stamped: SaveData = {
     ...data,
-    version: 4,
+    version: 5,
     knownDefaults: {
       missions: INITIAL_MISSIONS.map((m) => m.id),
       fights: INITIAL_FIGHTS.map((f) => f.id),
