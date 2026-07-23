@@ -564,12 +564,30 @@ export default function StealthCanvas({
     // the lower screen edge (default: a short 60px earth skirt); "extend
     // left/right" fills to the level's camera bounds so no edge gap shows.
     const screenBottomW = s.cameraY + canvas.height;
+    // Ground texture: the moss-log block art resolved through the mission's
+    // sprite set (night missions get the darkened variant).
+    const groundSprite = findSprite(sprites, 'moss_log', prologue.spriteSet ?? 'day');
+    const groundImg = groundSprite ? spriteImage(groundSprite, null) : null;
     prologue.platforms.forEach((plat) => {
       const fillBottom = plat.extendDown
         ? Math.max(plat.y + plat.height + 60, screenBottomW)
         : plat.y + plat.height + 60;
       const fillLeft = plat.extendLeft ? Math.min(plat.x, 0) : plat.x;
       const fillRight = plat.extendRight ? Math.max(plat.x + plat.width, s.levelLength) : plat.x + plat.width;
+      if (groundImg) {
+        // Same slice semantics as the platformer: outer 20% of the image
+        // stretches into the extended footprint, the bottom 20% fills the
+        // earth skirt below the walkable cap.
+        const W = groundImg.naturalWidth, H = groundImg.naturalHeight;
+        const sliceW = Math.max(1, Math.floor(W * 0.2));
+        const sliceH = Math.max(1, Math.floor(H * 0.2));
+        if (fillLeft < plat.x) ctx.drawImage(groundImg, 0, 0, sliceW, H, fillLeft, plat.y, plat.x - fillLeft, plat.height);
+        if (fillRight > plat.x + plat.width) ctx.drawImage(groundImg, W - sliceW, 0, sliceW, H, plat.x + plat.width, plat.y, fillRight - (plat.x + plat.width), plat.height);
+        ctx.drawImage(groundImg, plat.x, plat.y, plat.width, plat.height);
+        const top = plat.y + plat.height;
+        if (fillBottom > top) ctx.drawImage(groundImg, 0, H - sliceH, W, sliceH, fillLeft, top, fillRight - fillLeft, fillBottom - top);
+        return;
+      }
       ctx.fillStyle = '#3f2a18';
       ctx.fillRect(fillLeft, plat.y, fillRight - fillLeft, fillBottom - plat.y);
       ctx.fillStyle = '#1f5132';
@@ -612,13 +630,21 @@ export default function StealthCanvas({
     const cy = spot.y - spot.height / 2 + 14;
 
     if (spot.kind === 'leaf_shadow') {
-      // Tree trunk + big leaf casting shadow
-      ctx.fillStyle = '#3f2a18';
-      ctx.fillRect(spot.x + spot.width - 10, spot.y - spot.height, 10, spot.height + 10);
-      ctx.fillStyle = '#15803d';
-      ctx.beginPath();
-      ctx.ellipse(spot.x + spot.width / 2, spot.y - spot.height + 8, spot.width / 1.5, 22, -0.2, 0, Math.PI * 2);
-      ctx.fill();
+      // Shade-casting tree: the round-tree prop (night variant on night
+      // missions), with the original procedural trunk + leaf as fallback.
+      const treeSprite = findSprite(sprites, 'round_tree', prologue.spriteSet ?? 'day');
+      const treeImg = treeSprite ? spriteImage(treeSprite, null) : null;
+      if (treeSprite && treeImg) {
+        drawSpriteImage(ctx, treeImg, spot.x + spot.width / 2, spot.y + 6, treeSprite.width, treeSprite.height, false);
+      } else {
+        ctx.fillStyle = '#3f2a18';
+        ctx.fillRect(spot.x + spot.width - 10, spot.y - spot.height, 10, spot.height + 10);
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.ellipse(spot.x + spot.width / 2, spot.y - spot.height + 8, spot.width / 1.5, 22, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // The dark shadow pool stays — it is the "you can hide here" signal.
       ctx.fillStyle = 'rgba(2, 10, 6, 0.82)';
       ctx.beginPath();
       ctx.ellipse(cx, spot.y - spot.height / 2 + 18, spot.width / 2, spot.height / 2, 0, 0, Math.PI * 2);
