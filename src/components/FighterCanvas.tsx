@@ -9,6 +9,7 @@ import { audioSynth } from '../audio';
 import { Landmark, Swords, Play } from 'lucide-react';
 import { Lang, UI } from '../i18n';
 import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
+import { decodeImageUrls } from '../assets';
 
 // --- Arena geometry (fixed single screen, no scroll). The arena is authored
 // in a 420-tall world (Mowgli ~1/3 of it) and rendered scaled up to the
@@ -130,7 +131,18 @@ export default function FighterCanvas({
     audioSynth.startJungleMusic();
   }, [fight]);
 
+  // Hold the first frame until the fighter art has decoded — otherwise the
+  // procedural fallback fighters flash briefly when the duel opens.
+  const [assetsReady, setAssetsReady] = useState(false);
   useEffect(() => {
+    let alive = true;
+    setAssetsReady(false);
+    decodeImageUrls(sprites.flatMap((sp) => sp.frames)).then(() => { if (alive) setAssetsReady(true); });
+    return () => { alive = false; };
+  }, [sprites]);
+
+  useEffect(() => {
+    if (!assetsReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -311,7 +323,7 @@ export default function FighterCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [fight, paused, won, sprites]);
+  }, [fight, paused, won, sprites, assetsReady]);
 
   // Advance an attacker's state machine; resolve a single hit on strike entry.
   const advanceAttack = (self: FighterState, other: FighterState, selfIsPlayer: boolean, dt: number, s: typeof stateRef.current) => {

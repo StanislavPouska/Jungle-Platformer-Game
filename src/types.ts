@@ -33,7 +33,11 @@ export interface Platform {
   width: number;
   height: number;
   type: 'moss_log' | 'jungle_brick' | 'vine_bridge' | 'canopy_leaves';
-  spriteId?: string; // custom sprite rendering override (placed from the sprite palette)
+  spriteId?: string;    // custom sprite rendering override (placed from the sprite palette)
+  extendDown?: boolean; // visually extend to the bottom of the screen (grounded look);
+                        // unset = the historical default: non-moving logs/bricks extend
+  extendLeft?: boolean;  // visually extend to the level's left screen bound (x = 0)
+  extendRight?: boolean; // visually extend to the level's right screen bound (endX + 350)
   moving?: boolean;
   startX?: number;
   startY?: number;
@@ -80,7 +84,7 @@ export type ChapterId = 'prologue' | 'ch1' | 'ch2' | 'epilogue';
 
 // Background art for a mission. Presets reference the layered SVG sets already
 // shipped in /public/assets; a per-mission custom image (data URL) overrides them.
-export type LevelBackgroundId = 'jungle' | 'night_raid';
+export type LevelBackgroundId = 'jungle' | 'night_raid' | 'deep_jungle';
 
 // --- Stealth-mission building blocks: a crawling stage with its own
 // simplified movement model (no gravity or jumping — the toddler Mowgli
@@ -93,6 +97,9 @@ export interface StepPlatform {
   width: number;
   y: number; // ground surface the player/tiger walk on
   height: number; // visual thickness; also the max climbable step delta
+  extendDown?: boolean;  // fill down to the bottom of the screen (default: a short 60px skirt)
+  extendLeft?: boolean;  // fill to the level's left screen bound (x = 0)
+  extendRight?: boolean; // fill to the level's right screen bound (levelMaxX + 200)
 }
 
 export interface HidingSpot {
@@ -182,6 +189,11 @@ export interface TriggerPlacement {
   chapterCard?: ChapterId;    // optionally show a chapter title card before launching
 }
 
+// Which sprite-library group a mission renders with. 'night' makes every
+// sprite lookup prefer the darkened night variant (id `night_<baseId>`),
+// falling back to the day sprite when no night variant has frames.
+export type SpriteSet = 'day' | 'night';
+
 interface MissionBase {
   id: number;
   name: string;
@@ -190,6 +202,7 @@ interface MissionBase {
   triggers: TriggerPlacement[];
   background?: LevelBackgroundId;   // preset art set (defaults per type)
   backgroundImage?: string;         // optional custom image (data URL) — overrides the preset
+  spriteSet?: SpriteSet;            // sprite group used for rendering (default 'day')
 }
 
 export interface PlatformerMission extends MissionBase {
@@ -226,6 +239,9 @@ export type Mission = PlatformerMission | StealthMission;
 // missions as platforms.
 
 export type SpriteKind = 'block' | 'character';
+
+/** Id prefix marking a sprite as the night variant of `<baseId>`. */
+export const NIGHT_SPRITE_PREFIX = 'night_';
 
 export interface SpriteDef {
   id: string;

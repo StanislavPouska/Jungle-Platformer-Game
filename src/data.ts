@@ -7,6 +7,7 @@ import {
   ChapterId,
   FightDef,
   Mission,
+  NIGHT_SPRITE_PREFIX,
   PlatformerMission,
   PoolQuestion,
   QuizDef,
@@ -494,6 +495,7 @@ const PROLOGUE_MISSION: StealthMission = {
   name: "Shere Khan's Raid",
   description: 'Shere Khan has attacked the village! As a crawling toddler, Mowgli must creep through the jungle, ducking into caves and leaf-shadows to hide from the prowling tiger.',
   background: 'night_raid',
+  spriteSet: 'night',
   triggers: [],
   startX: 60,
   levelMinX: 20,
@@ -552,23 +554,49 @@ export const INITIAL_MISSIONS: Mission[] = [
 // editor's Sprites tab lets the user upload images (multiple on a character =
 // its move animation) and tune render sizes. Ids are well-known: entity code
 // looks its sprite up by these exact strings.
-export const INITIAL_SPRITES: SpriteDef[] = [
-  // Blocks (platforms, creatures, pickups, the goal)
-  { id: 'moss_log', name: 'Moss Log', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
-  { id: 'jungle_brick', name: 'Jungle Brick', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
-  { id: 'vine_bridge', name: 'Vine Bridge', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
-  { id: 'canopy_leaves', name: 'Canopy Leaves', kind: 'block', width: 160, height: 35, frames: [], frameDuration: 140 },
-  { id: 'toad', name: 'Spring Toad', kind: 'block', width: 44, height: 24, frames: [], frameDuration: 140 },
+const DAY_SPRITES: SpriteDef[] = [
+  // Blocks (platforms, creatures, pickups, the goal). Terrain textures are
+  // sliced from the CC0 "2D Platformer Jungle Pack" by Tio Aimar
+  // (opengameart.org/content/2d-platformer-jungle-pack).
+  { id: 'moss_log', name: 'Moss Log', kind: 'block', width: 160, height: 35, frames: ['/assets/sprites/block-moss-log.png'], frameDuration: 140 },
+  { id: 'jungle_brick', name: 'Jungle Brick', kind: 'block', width: 160, height: 35, frames: ['/assets/sprites/block-jungle-brick.png'], frameDuration: 140 },
+  { id: 'vine_bridge', name: 'Vine Bridge', kind: 'block', width: 160, height: 35, frames: ['/assets/sprites/block-vine-bridge.png'], frameDuration: 140 },
+  { id: 'canopy_leaves', name: 'Canopy Leaves', kind: 'block', width: 160, height: 35, frames: ['/assets/sprites/block-canopy-leaves.png'], frameDuration: 140 },
+  { id: 'toad', name: 'Spring Toad', kind: 'block', width: 44, height: 24, frames: ['/assets/sprites/toad-1.png', '/assets/sprites/toad-2.png'], frameDuration: 320 },
   { id: 'banana', name: 'Banana', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
   { id: 'mango', name: 'Mango', kind: 'block', width: 22, height: 28, frames: [], frameDuration: 140 },
   { id: 'star', name: 'Golden Star', kind: 'block', width: 26, height: 26, frames: [], frameDuration: 140 },
   { id: 'portal', name: 'Safety Portal', kind: 'block', width: 96, height: 90, frames: [], frameDuration: 140 },
-  // Characters (multiple frames = move animation)
-  { id: 'mowgli', name: 'Mowgli', kind: 'character', width: 30, height: 50, frames: [], frameDuration: 140 },
-  { id: 'baby_mowgli', name: 'Baby Mowgli', kind: 'character', width: 30, height: 20, frames: [], frameDuration: 140 },
-  { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [], frameDuration: 140 },
-  { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [], frameDuration: 140 },
-  { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [], frameDuration: 140 },
+  // Decorative jungle props (placeable as standable blocks) — same CC0 pack
+  { id: 'jungle_tree', name: 'Tall Tree', kind: 'block', width: 80, height: 183, frames: ['/assets/sprites/prop-tree-tall.png'], frameDuration: 140 },
+  { id: 'round_tree', name: 'Round Tree', kind: 'block', width: 92, height: 151, frames: ['/assets/sprites/prop-tree-round.png'], frameDuration: 140 },
+  { id: 'tree_stump', name: 'Tree Stump', kind: 'block', width: 50, height: 40, frames: ['/assets/sprites/prop-stump.png'], frameDuration: 140 },
+  { id: 'jungle_sprig', name: 'Jungle Sprig', kind: 'block', width: 54, height: 60, frames: ['/assets/sprites/prop-sprig.png'], frameDuration: 140 },
+  { id: 'flower_blue', name: 'Blue Flower', kind: 'block', width: 48, height: 28, frames: ['/assets/sprites/prop-flower-blue.png'], frameDuration: 140 },
+  { id: 'flower_red', name: 'Red Flower', kind: 'block', width: 48, height: 28, frames: ['/assets/sprites/prop-flower-red.png'], frameDuration: 140 },
+  { id: 'flower_yellow', name: 'Yellow Flower', kind: 'block', width: 48, height: 28, frames: ['/assets/sprites/prop-flower-yellow.png'], frameDuration: 140 },
+  // Characters (multiple frames = move animation; frame 1 doubles as the idle
+  // pose). Bundled art lives in public/assets/sprites — replaceable per sprite
+  // in the editor's Sprites tab.
+  { id: 'mowgli', name: 'Mowgli', kind: 'character', width: 30, height: 50, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/mowgli-${n}.png`), frameDuration: 110 },
+  { id: 'baby_mowgli', name: 'Baby Mowgli', kind: 'character', width: 30, height: 20, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/baby-mowgli-${n}.png`), frameDuration: 130 },
+  { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/tiger-${n}.png`), frameDuration: 160 },
+  { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/mowgli-torch-${n}.png`), frameDuration: 170 },
+  { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/shere-khan-${n}.png`), frameDuration: 170 },
+];
+
+// The night group: a copy of every day sprite pointing at 30%-darkened
+// variants of the bundled art (pre-rendered in /assets/sprites/night).
+// Missions with spriteSet 'night' resolve their sprites through these first
+// (empty night frames fall back to the day sprite, then to procedural art).
+export const INITIAL_SPRITES: SpriteDef[] = [
+  ...DAY_SPRITES,
+  ...DAY_SPRITES.map((s) => ({
+    ...s,
+    id: NIGHT_SPRITE_PREFIX + s.id,
+    name: `${s.name} (Night)`,
+    frames: s.frames.map((f) => f.replace('/assets/sprites/', '/assets/sprites/night/')),
+  })),
 ];
 
 export const INITIAL_SETTINGS = {

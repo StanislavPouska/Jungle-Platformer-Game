@@ -10,7 +10,7 @@ import { Landmark, RotateCcw, Play } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
 import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
-import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, decodeImageUrls, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
 preloadAssets();
@@ -170,7 +170,20 @@ export default function StealthCanvas({
     audioSynth.startJungleMusic();
   }, [prologue]);
 
+  // Hold the first frame until the sprite art has decoded — otherwise the
+  // procedural fallback graphics flash briefly at level start.
+  const [assetsReady, setAssetsReady] = useState(false);
   useEffect(() => {
+    let alive = true;
+    setAssetsReady(false);
+    const urls = sprites.flatMap((sp) => sp.frames);
+    if (prologue.backgroundImage) urls.push(prologue.backgroundImage);
+    decodeImageUrls(urls).then(() => { if (alive) setAssetsReady(true); });
+    return () => { alive = false; };
+  }, [sprites, prologue]);
+
+  useEffect(() => {
+    if (!assetsReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -422,7 +435,7 @@ export default function StealthCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [prologue, paused, escaped, activeTrigger, questionPool, sprites]);
+  }, [prologue, paused, escaped, activeTrigger, questionPool, sprites, assetsReady]);
 
   // ---- trigger gate resolutions ---------------------------------------------
   const closeGate = () => {
@@ -560,12 +573,38 @@ export default function StealthCanvas({
     ctx.save();
     ctx.translate(-s.cameraX, -s.cameraY);
 
-    // Ground step platforms
+    // Ground step platforms — "extend to bottom" fills all the way down to
+    // the lower screen edge (default: a short 60px earth skirt); "extend
+    // left/right" fills to the level's camera bounds so no edge gap shows.
+    const screenBottomW = s.cameraY + canvas.height;
+    // Ground texture: the moss-log block art resolved through the mission's
+    // sprite set (night missions get the darkened variant).
+    const groundSprite = findSprite(sprites, 'moss_log', prologue.spriteSet ?? 'day');
+    const groundImg = groundSprite ? spriteImage(groundSprite, null) : null;
     prologue.platforms.forEach((plat) => {
+      const fillBottom = plat.extendDown
+        ? Math.max(plat.y + plat.height + 60, screenBottomW)
+        : plat.y + plat.height + 60;
+      const fillLeft = plat.extendLeft ? Math.min(plat.x, 0) : plat.x;
+      const fillRight = plat.extendRight ? Math.max(plat.x + plat.width, s.levelLength) : plat.x + plat.width;
+      if (groundImg) {
+        // Same slice semantics as the platformer: outer 20% of the image
+        // stretches into the extended footprint, the bottom 20% fills the
+        // earth skirt below the walkable cap.
+        const W = groundImg.naturalWidth, H = groundImg.naturalHeight;
+        const sliceW = Math.max(1, Math.floor(W * 0.2));
+        const sliceH = Math.max(1, Math.floor(H * 0.2));
+        if (fillLeft < plat.x) ctx.drawImage(groundImg, 0, 0, sliceW, H, fillLeft, plat.y, plat.x - fillLeft, plat.height);
+        if (fillRight > plat.x + plat.width) ctx.drawImage(groundImg, W - sliceW, 0, sliceW, H, plat.x + plat.width, plat.y, fillRight - (plat.x + plat.width), plat.height);
+        ctx.drawImage(groundImg, plat.x, plat.y, plat.width, plat.height);
+        const top = plat.y + plat.height;
+        if (fillBottom > top) ctx.drawImage(groundImg, 0, H - sliceH, W, sliceH, fillLeft, top, fillRight - fillLeft, fillBottom - top);
+        return;
+      }
       ctx.fillStyle = '#3f2a18';
-      ctx.fillRect(plat.x, plat.y, plat.width, plat.height + 60);
+      ctx.fillRect(fillLeft, plat.y, fillRight - fillLeft, fillBottom - plat.y);
       ctx.fillStyle = '#1f5132';
-      ctx.fillRect(plat.x, plat.y, plat.width, 8);
+      ctx.fillRect(fillLeft, plat.y, fillRight - fillLeft, 8);
     });
 
     // Hiding spots
@@ -604,13 +643,21 @@ export default function StealthCanvas({
     const cy = spot.y - spot.height / 2 + 14;
 
     if (spot.kind === 'leaf_shadow') {
-      // Tree trunk + big leaf casting shadow
-      ctx.fillStyle = '#3f2a18';
-      ctx.fillRect(spot.x + spot.width - 10, spot.y - spot.height, 10, spot.height + 10);
-      ctx.fillStyle = '#15803d';
-      ctx.beginPath();
-      ctx.ellipse(spot.x + spot.width / 2, spot.y - spot.height + 8, spot.width / 1.5, 22, -0.2, 0, Math.PI * 2);
-      ctx.fill();
+      // Shade-casting tree: the round-tree prop (night variant on night
+      // missions), with the original procedural trunk + leaf as fallback.
+      const treeSprite = findSprite(sprites, 'round_tree', prologue.spriteSet ?? 'day');
+      const treeImg = treeSprite ? spriteImage(treeSprite, null) : null;
+      if (treeSprite && treeImg) {
+        drawSpriteImage(ctx, treeImg, spot.x + spot.width / 2, spot.y + 6, treeSprite.width, treeSprite.height, false);
+      } else {
+        ctx.fillStyle = '#3f2a18';
+        ctx.fillRect(spot.x + spot.width - 10, spot.y - spot.height, 10, spot.height + 10);
+        ctx.fillStyle = '#15803d';
+        ctx.beginPath();
+        ctx.ellipse(spot.x + spot.width / 2, spot.y - spot.height + 8, spot.width / 1.5, 22, -0.2, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      // The dark shadow pool stays — it is the "you can hide here" signal.
       ctx.fillStyle = 'rgba(2, 10, 6, 0.82)';
       ctx.beginPath();
       ctx.ellipse(cx, spot.y - spot.height / 2 + 18, spot.width / 2, spot.height / 2, 0, 0, Math.PI * 2);
@@ -667,7 +714,7 @@ export default function StealthCanvas({
 
   const drawToddler = (ctx: CanvasRenderingContext2D, p: typeof stateRef.current.player) => {
     // Sprite override — frames animate while crawling
-    const spr = findSprite(sprites, 'baby_mowgli');
+    const spr = findSprite(sprites, 'baby_mowgli', prologue.spriteSet ?? 'day');
     const img = spr ? spriteImage(spr, Math.abs(p.vx) > 0.1 ? performance.now() : null) : null;
     if (spr && img) {
       drawSpriteImage(ctx, img, p.x + PLAYER_W / 2, p.y + 2, spr.width, spr.height, p.facing === 'left');
@@ -728,7 +775,7 @@ export default function StealthCanvas({
     const wiggle = sniffing ? Math.sin((s.frameId ?? 0) / 4) * 3 : 0;
 
     // Sprite override — the prowl is always in motion, so always animate
-    const spr = findSprite(sprites, 'tiger');
+    const spr = findSprite(sprites, 'tiger', prologue.spriteSet ?? 'day');
     const img = spr ? spriteImage(spr, performance.now()) : null;
     if (spr && img) {
       drawSpriteImage(ctx, img, tiger.x + wiggle, tiger.y + 14, spr.width, spr.height, tiger.dir < 0);

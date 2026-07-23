@@ -4,7 +4,7 @@
  */
 
 import React, { useRef, useState } from 'react';
-import { Mission, SpriteDef, SpriteKind, WorldData } from '../types';
+import { Mission, NIGHT_SPRITE_PREFIX, SpriteDef, SpriteKind, WorldData } from '../types';
 import { Lang, UI } from '../i18n';
 import { Plus, Copy, Trash2, X, Image as ImageIcon, Upload, Box, PersonStanding } from 'lucide-react';
 import { TextField, NumberField, makeLibraryId, downscaleImage } from './editorFields';
@@ -111,8 +111,11 @@ export default function SpriteEditor({ world, onWorldChange, language }: SpriteE
   };
 
   const used = sprite ? usedByMissions(sprite.id) : [];
-  const blocks = sprites.filter((s) => s.kind === 'block');
-  const characters = sprites.filter((s) => s.kind === 'character');
+  // Two groups: the day set, and its darkened night copies (id `night_*`) that
+  // missions with the night sprite set render instead.
+  const isNight = (s: SpriteDef) => s.id.startsWith(NIGHT_SPRITE_PREFIX);
+  const daySprites = sprites.filter((s) => !isNight(s));
+  const nightSprites = sprites.filter(isNight);
 
   const listButton = (s: SpriteDef) => (
     <button
@@ -145,10 +148,26 @@ export default function SpriteEditor({ world, onWorldChange, language }: SpriteE
         </div>
         <p className="text-[10px] text-gray-400 leading-snug">{t.editorSpriteHint}</p>
 
-        <div className="text-[10px] font-mono uppercase text-gray-500">{t.editorSpriteBlocks}</div>
-        <div className="space-y-1">{blocks.map(listButton)}</div>
-        <div className="text-[10px] font-mono uppercase text-gray-500 pt-1">{t.editorSpriteCharacters}</div>
-        <div className="space-y-1">{characters.map(listButton)}</div>
+        {[
+          { header: t.editorSpriteGroupDay, group: daySprites, headerClass: 'text-amber-300', idSuffix: 'day' },
+          { header: t.editorSpriteGroupNight, group: nightSprites, headerClass: 'text-indigo-300', idSuffix: 'night' },
+        ].map(({ header, group, headerClass, idSuffix }) => (
+          <React.Fragment key={idSuffix}>
+            <div className={`text-[11px] font-mono font-bold uppercase tracking-wider pt-1 ${headerClass}`} id={`sprite-group-${idSuffix}`}>{header}</div>
+            {group.some((s) => s.kind === 'block') && (
+              <>
+                <div className="text-[10px] font-mono uppercase text-gray-500">{t.editorSpriteBlocks}</div>
+                <div className="space-y-1">{group.filter((s) => s.kind === 'block').map(listButton)}</div>
+              </>
+            )}
+            {group.some((s) => s.kind === 'character') && (
+              <>
+                <div className="text-[10px] font-mono uppercase text-gray-500 pt-1">{t.editorSpriteCharacters}</div>
+                <div className="space-y-1">{group.filter((s) => s.kind === 'character').map(listButton)}</div>
+              </>
+            )}
+          </React.Fragment>
+        ))}
 
         <div className="grid grid-cols-2 gap-1.5 pt-1">
           <button onClick={() => handleNew('block')} className="flex items-center justify-center gap-1 py-1.5 rounded-md bg-emerald-700/40 hover:bg-emerald-600/50 border border-emerald-600/40 text-emerald-200 text-[10px] cursor-pointer" id="editor-new-sprite-block">

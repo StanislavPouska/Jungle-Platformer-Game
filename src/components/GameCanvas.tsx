@@ -23,8 +23,8 @@ import { audioSynth } from '../audio';
 import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
-import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
-import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import { findSprite, spriteImage, drawSpriteImage, platformExtendsDown } from '../sprites';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, decodeImageUrls, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
 preloadAssets();
@@ -204,8 +204,21 @@ export default function GameCanvas({
     };
   }, [level, settings.doubleJumpEnabled, stats.currentLevel, stats.gameState]);
 
+  // Hold the first frame until the sprite art has decoded — otherwise the
+  // procedural fallback graphics flash briefly at level start.
+  const [assetsReady, setAssetsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setAssetsReady(false);
+    const urls = sprites.flatMap((sp) => sp.frames);
+    if (level.backgroundImage) urls.push(level.backgroundImage);
+    decodeImageUrls(urls).then(() => { if (alive) setAssetsReady(true); });
+    return () => { alive = false; };
+  }, [sprites, level]);
+
   // Main Loop Setup
   useEffect(() => {
+    if (!assetsReady) return;
     // Canvas context
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -400,7 +413,7 @@ export default function GameCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [level, paused, settings, activeTrigger, language, questionPool, sprites]);
+  }, [level, paused, settings, activeTrigger, language, questionPool, sprites, assetsReady]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
@@ -803,6 +816,7 @@ export default function GameCanvas({
     // chosen preset's layered assets, then a procedural fallback.
     const customBg = level.backgroundImage ? getImageFromDataUrl(level.backgroundImage) : null;
     const preset = LEVEL_BACKGROUNDS[level.background ?? 'jungle'] ?? LEVEL_BACKGROUNDS.jungle;
+    const spriteSet = level.spriteSet ?? 'day';
     const skyImg = getImage(preset.sky);
     const farImg = getImage(preset.far);
     const nearImg = getImage(preset.near);
@@ -881,12 +895,27 @@ export default function GameCanvas({
       // Level 1: the platform at the very end of the level extends to both the
       // left and right edges of the screen once the camera reaches the end.
       const isEndPlatform = level.id === 1 && plat.x + plat.width >= level.endX - 40;
-      const dx = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
-      const dw = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
+      const baseX = (isEndPlatform && atLevelEnd) ? screenLeftW : plat.x;
+      const baseW = (isEndPlatform && atLevelEnd) ? (screenRightW - screenLeftW) : plat.width;
 
-      // Solid ground (logs & bricks) extends straight down to the lower edge of
-      // the screen so the bottom platforms look grounded, not floating.
-      if (!plat.moving && (plat.type === 'moss_log' || plat.type === 'jungle_brick')) {
+      // "Extend left/right": visually stretch the block to the level's camera
+      // bounds (0 / endX+350) so no gap shows at the level's start or end.
+      const extendLeft = !plat.moving && !!plat.extendLeft;
+      const extendRight = !plat.moving && !!plat.extendRight;
+      const dx = extendLeft ? Math.min(baseX, 0) : baseX;
+      const dRight = extendRight ? Math.max(baseX + baseW, s.levelLength) : baseX + baseW;
+      const dw = dRight - dx;
+
+      // Sprite override: a custom placed sprite, or an uploaded image on the
+      // platform's built-in type sprite, replaces the procedural texture.
+      const platSprite = findSprite(sprites, plat.spriteId, spriteSet) ?? findSprite(sprites, plat.type, spriteSet);
+      const platImg = platSprite ? spriteImage(platSprite, performance.now()) : null;
+      const extendsDown = platformExtendsDown(plat);
+
+      // "Extend to bottom": the platform reaches the lower edge of the screen
+      // so it looks grounded, not floating. With a sprite image the bottom 20%
+      // of the image is stretched downward; otherwise an earth column is drawn.
+      if (extendsDown && !platImg) {
         const colTop = plat.y + 6;
         if (screenBottomW > colTop) {
           const earth = ctx.createLinearGradient(0, colTop, 0, screenBottomW);
@@ -897,15 +926,27 @@ export default function GameCanvas({
         }
       }
 
-      // Sprite override: a custom placed sprite, or an uploaded image on the
-      // platform's built-in type sprite, replaces the procedural texture.
-      const platSprite = findSprite(sprites, plat.spriteId) ?? findSprite(sprites, plat.type);
-      if (platSprite) {
-        const img = spriteImage(platSprite, performance.now());
-        if (img) {
-          ctx.drawImage(img, dx, plat.y, dw, plat.height);
-          return;
+      if (platImg) {
+        const W = platImg.naturalWidth;
+        const H = platImg.naturalHeight;
+        // Body keeps its authored proportions; side extensions stretch the
+        // image's outer 20% slices toward the level bounds.
+        const sliceW = Math.max(1, Math.floor(W * 0.2));
+        if (dx < baseX) {
+          ctx.drawImage(platImg, 0, 0, sliceW, H, dx, plat.y, baseX - dx, plat.height);
         }
+        if (dRight > baseX + baseW) {
+          ctx.drawImage(platImg, W - sliceW, 0, sliceW, H, baseX + baseW, plat.y, dRight - (baseX + baseW), plat.height);
+        }
+        ctx.drawImage(platImg, baseX, plat.y, baseW, plat.height);
+        if (extendsDown) {
+          const top = plat.y + plat.height;
+          if (screenBottomW > top) {
+            const sliceH = Math.max(1, Math.floor(H * 0.2));
+            ctx.drawImage(platImg, 0, H - sliceH, W, sliceH, dx, top, dw, screenBottomW - top);
+          }
+        }
+        return;
       }
 
       // Platform moss pattern textures
@@ -1015,7 +1056,7 @@ export default function GameCanvas({
       ctx.scale(scaleX, scaleY);
 
       // Sprite override — drawn inside the squish transform so it still squashes
-      const toadSprite = findSprite(sprites, 'toad');
+      const toadSprite = findSprite(sprites, 'toad', spriteSet);
       const toadImg = toadSprite ? spriteImage(toadSprite, performance.now()) : null;
       if (toadSprite && toadImg) {
         ctx.drawImage(toadImg, -toadSprite.width / 2, -toadSprite.height, toadSprite.width, toadSprite.height);
@@ -1073,7 +1114,7 @@ export default function GameCanvas({
       const bobY = col.y + Math.sin((s.frameId + col.bobOffset) / 10) * 3.5;
 
       // Sprite override — keeps the bobbing motion
-      const colSprite = findSprite(sprites, col.type);
+      const colSprite = findSprite(sprites, col.type, spriteSet);
       const colImg = colSprite ? spriteImage(colSprite, performance.now()) : null;
       if (colSprite && colImg) {
         ctx.drawImage(colImg, col.x - colSprite.width / 2, bobY - colSprite.height / 2, colSprite.width, colSprite.height);
@@ -1122,7 +1163,7 @@ export default function GameCanvas({
     const portalX = level.endX;
     const portalY = level.endY;
 
-    const portalSprite = findSprite(sprites, 'portal');
+    const portalSprite = findSprite(sprites, 'portal', spriteSet);
     const portalImg = portalSprite ? spriteImage(portalSprite, performance.now()) : null;
     if (portalSprite && portalImg) {
       // Sprite override — anchored to the portal's pillar base
@@ -1173,7 +1214,7 @@ export default function GameCanvas({
 
     // 7. Draw MOWGLI character! (sprite frames animate while running)
     if (s.deathTimer === 0) {
-      const mowgliSprite = findSprite(sprites, 'mowgli');
+      const mowgliSprite = findSprite(sprites, 'mowgli', spriteSet);
       const mowgliImg = mowgliSprite
         ? spriteImage(mowgliSprite, p.state === 'idle' ? null : performance.now())
         : null;

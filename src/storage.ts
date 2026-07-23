@@ -35,12 +35,85 @@ export interface KnownDefaults {
 }
 
 export interface SaveData {
+  version: 7;
+  stats: GameStats;
+  settings: GameSettings;
+  world: WorldData;
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+// --- v6 legacy shape (no day/night sprite groups yet) -------------------------
+
+interface SaveDataV6 {
+  version: 6;
+  stats: GameStats;
+  settings: GameSettings;
+  world: WorldData;
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+/**
+ * Day/night sprite groups: the night sprite entries themselves arrive via the
+ * defaults merge; this stamps the built-in stealth prologue (mission 0) to
+ * render with the night set, matching the new default. Only an absent
+ * spriteSet is touched, so a later explicit choice is never overridden.
+ */
+function migrateV6(v6: SaveDataV6): SaveData {
+  const missions = v6.world.missions.map((m) =>
+    m.id === 0 && m.spriteSet === undefined ? { ...m, spriteSet: 'night' as const } : m,
+  );
+  return { ...v6, version: 7, world: { ...v6.world, missions } };
+}
+
+/**
+ * One-time stamp of the bundled default art onto sprites that still have no
+ * frames. Empty-frames sprites all rendered as procedural canvas art — the
+ * bundled PNGs are the new default look for exactly those. Runs only during
+ * migration, so frames a user deletes in the editor afterwards stay deleted.
+ */
+function stampDefaultFrames(world: WorldData): WorldData {
+  const sprites = (world.sprites ?? []).map((s) => {
+    if (s.frames.length > 0) return s;
+    const def = INITIAL_SPRITES.find((d) => d.id === s.id);
+    return def && def.frames.length > 0
+      ? { ...s, frames: [...def.frames], frameDuration: def.frameDuration }
+      : s;
+  });
+  return { ...world, sprites };
+}
+
+// --- v5 legacy shape (character art bundled, but block/prop art not yet) ------
+
+interface SaveDataV5 {
+  version: 5;
+  stats: GameStats;
+  settings: GameSettings;
+  world: WorldData;
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+/** Stamp the bundled block/prop textures onto still-procedural sprites. */
+function migrateV5(v5: SaveDataV5): SaveDataV6 {
+  return { ...v5, version: 6, world: stampDefaultFrames(v5.world) };
+}
+
+// --- v4 legacy shape (sprite library existed, but no bundled default art) -----
+
+interface SaveDataV4 {
   version: 4;
   stats: GameStats;
   settings: GameSettings;
   world: WorldData;
   savedAt: string;
   knownDefaults?: KnownDefaults;
+}
+
+/** Stamp the bundled character art onto still-procedural sprites. */
+function migrateV4(v4: SaveDataV4): SaveDataV5 {
+  return { ...v4, version: 5, world: stampDefaultFrames(v4.world) };
 }
 
 // --- v3 legacy shape (no sprite library yet) ----------------------------------
@@ -55,7 +128,7 @@ interface SaveDataV3 {
 }
 
 /** Add the sprite library: pre-sprite saves simply get the built-in set. */
-function migrateV3(v3: SaveDataV3): SaveData {
+function migrateV3(v3: SaveDataV3): SaveDataV4 {
   return {
     ...v3,
     version: 4,
@@ -251,11 +324,14 @@ export function readSaveData(): SaveData | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveData | SaveDataV3 | SaveDataV2 | SaveDataV1;
-    if ('version' in parsed && parsed.version === 4 && parsed.world) return parsed;
-    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV3(parsed);
-    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV3(migrateV2(parsed));
-    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV3(migrateV1(parsed));
+    const parsed = JSON.parse(raw) as SaveData | SaveDataV6 | SaveDataV5 | SaveDataV4 | SaveDataV3 | SaveDataV2 | SaveDataV1;
+    if ('version' in parsed && parsed.version === 7 && parsed.world) return parsed;
+    if ('version' in parsed && parsed.version === 6 && parsed.world) return migrateV6(parsed);
+    if ('version' in parsed && parsed.version === 5 && parsed.world) return migrateV6(migrateV5(parsed));
+    if ('version' in parsed && parsed.version === 4 && parsed.world) return migrateV6(migrateV5(migrateV4(parsed)));
+    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV6(migrateV5(migrateV4(migrateV3(parsed))));
+    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(parsed)))));
+    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV1(parsed)))));
     return null;
   } catch {
     return null;
@@ -340,7 +416,7 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
 export function writeSaveData(data: Omit<SaveData, 'version' | 'knownDefaults'>): SaveData | null {
   const stamped: SaveData = {
     ...data,
-    version: 4,
+    version: 7,
     knownDefaults: {
       missions: INITIAL_MISSIONS.map((m) => m.id),
       fights: INITIAL_FIGHTS.map((f) => f.id),
