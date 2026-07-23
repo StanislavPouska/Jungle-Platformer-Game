@@ -12,9 +12,11 @@ import {
   LevelBackgroundId,
   Mission,
   MissionType,
+  NIGHT_SPRITE_PREFIX,
   Platform,
   PlatformerMission,
   QuizDef,
+  SpriteSet,
   StealthMission,
   StepPlatform,
   Toad,
@@ -595,9 +597,11 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
   // Block sprites without a dedicated palette entry (props + user-created
   // blocks) get their own placeable entries; the classic platform types,
   // creatures and pickups already appear via their groups below.
+  // Night variants (`night_*`) are resolved automatically from the mission's
+  // sprite set, so they never appear as their own palette entries.
   const dedicatedPaletteIds = ['moss_log', 'jungle_brick', 'vine_bridge', 'canopy_leaves', 'toad', 'banana', 'mango', 'star', 'portal'];
   const customBlockSprites = world.sprites.filter(
-    (s) => s.kind === 'block' && !dedicatedPaletteIds.includes(s.id),
+    (s) => s.kind === 'block' && !dedicatedPaletteIds.includes(s.id) && !s.id.startsWith(NIGHT_SPRITE_PREFIX),
   );
 
   const platformPalette: { item: PaletteItem; label: string; color: string }[] = [
@@ -1383,6 +1387,19 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                 <option value="jungle">{t.editorBgJungle}</option>
                 <option value="night_raid">{t.editorBgNightRaid}</option>
                 <option value="deep_jungle">{t.editorBgDeepJungle}</option>
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-0.5">
+              <span className="text-[10px] font-mono uppercase tracking-wide text-gray-400">{t.editorSpriteSet}</span>
+              <select
+                value={mission.spriteSet ?? 'day'}
+                onChange={(e) => updateMission((m) => ({ ...m, spriteSet: e.target.value as SpriteSet }))}
+                className="bg-[#0c0419] border border-purple-900/50 rounded-md px-2 py-1 text-xs text-white outline-none focus:border-fuchsia-500"
+                id="editor-sprite-set"
+              >
+                <option value="day">{t.editorSpriteSetDay}</option>
+                <option value="night">{t.editorSpriteSetNight}</option>
               </select>
             </label>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" id="editor-bg-file" onChange={(e) => { handleBgFile(e.target.files?.[0]); e.target.value = ''; }} />

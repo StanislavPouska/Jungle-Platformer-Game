@@ -35,12 +35,36 @@ export interface KnownDefaults {
 }
 
 export interface SaveData {
+  version: 7;
+  stats: GameStats;
+  settings: GameSettings;
+  world: WorldData;
+  savedAt: string;
+  knownDefaults?: KnownDefaults;
+}
+
+// --- v6 legacy shape (no day/night sprite groups yet) -------------------------
+
+interface SaveDataV6 {
   version: 6;
   stats: GameStats;
   settings: GameSettings;
   world: WorldData;
   savedAt: string;
   knownDefaults?: KnownDefaults;
+}
+
+/**
+ * Day/night sprite groups: the night sprite entries themselves arrive via the
+ * defaults merge; this stamps the built-in stealth prologue (mission 0) to
+ * render with the night set, matching the new default. Only an absent
+ * spriteSet is touched, so a later explicit choice is never overridden.
+ */
+function migrateV6(v6: SaveDataV6): SaveData {
+  const missions = v6.world.missions.map((m) =>
+    m.id === 0 && m.spriteSet === undefined ? { ...m, spriteSet: 'night' as const } : m,
+  );
+  return { ...v6, version: 7, world: { ...v6.world, missions } };
 }
 
 /**
@@ -72,7 +96,7 @@ interface SaveDataV5 {
 }
 
 /** Stamp the bundled block/prop textures onto still-procedural sprites. */
-function migrateV5(v5: SaveDataV5): SaveData {
+function migrateV5(v5: SaveDataV5): SaveDataV6 {
   return { ...v5, version: 6, world: stampDefaultFrames(v5.world) };
 }
 
@@ -300,13 +324,14 @@ export function readSaveData(): SaveData | null {
   try {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as SaveData | SaveDataV5 | SaveDataV4 | SaveDataV3 | SaveDataV2 | SaveDataV1;
-    if ('version' in parsed && parsed.version === 6 && parsed.world) return parsed;
-    if ('version' in parsed && parsed.version === 5 && parsed.world) return migrateV5(parsed);
-    if ('version' in parsed && parsed.version === 4 && parsed.world) return migrateV5(migrateV4(parsed));
-    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV5(migrateV4(migrateV3(parsed)));
-    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV5(migrateV4(migrateV3(migrateV2(parsed))));
-    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV5(migrateV4(migrateV3(migrateV1(parsed))));
+    const parsed = JSON.parse(raw) as SaveData | SaveDataV6 | SaveDataV5 | SaveDataV4 | SaveDataV3 | SaveDataV2 | SaveDataV1;
+    if ('version' in parsed && parsed.version === 7 && parsed.world) return parsed;
+    if ('version' in parsed && parsed.version === 6 && parsed.world) return migrateV6(parsed);
+    if ('version' in parsed && parsed.version === 5 && parsed.world) return migrateV6(migrateV5(parsed));
+    if ('version' in parsed && parsed.version === 4 && parsed.world) return migrateV6(migrateV5(migrateV4(parsed)));
+    if ('version' in parsed && parsed.version === 3 && parsed.world) return migrateV6(migrateV5(migrateV4(migrateV3(parsed))));
+    if ('version' in parsed && parsed.version === 2 && parsed.world) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV2(parsed)))));
+    if ('levels' in parsed && Array.isArray(parsed.levels)) return migrateV6(migrateV5(migrateV4(migrateV3(migrateV1(parsed)))));
     return null;
   } catch {
     return null;
@@ -391,7 +416,7 @@ export function mergeWithDefaults(saved: WorldData, known?: KnownDefaults): Worl
 export function writeSaveData(data: Omit<SaveData, 'version' | 'knownDefaults'>): SaveData | null {
   const stamped: SaveData = {
     ...data,
-    version: 6,
+    version: 7,
     knownDefaults: {
       missions: INITIAL_MISSIONS.map((m) => m.id),
       fights: INITIAL_FIGHTS.map((f) => f.id),

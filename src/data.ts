@@ -7,6 +7,7 @@ import {
   ChapterId,
   FightDef,
   Mission,
+  NIGHT_SPRITE_PREFIX,
   PlatformerMission,
   PoolQuestion,
   QuizDef,
@@ -494,6 +495,7 @@ const PROLOGUE_MISSION: StealthMission = {
   name: "Shere Khan's Raid",
   description: 'Shere Khan has attacked the village! As a crawling toddler, Mowgli must creep through the jungle, ducking into caves and leaf-shadows to hide from the prowling tiger.',
   background: 'night_raid',
+  spriteSet: 'night',
   triggers: [],
   startX: 60,
   levelMinX: 20,
@@ -552,7 +554,7 @@ export const INITIAL_MISSIONS: Mission[] = [
 // editor's Sprites tab lets the user upload images (multiple on a character =
 // its move animation) and tune render sizes. Ids are well-known: entity code
 // looks its sprite up by these exact strings.
-export const INITIAL_SPRITES: SpriteDef[] = [
+const DAY_SPRITES: SpriteDef[] = [
   // Blocks (platforms, creatures, pickups, the goal). Terrain textures are
   // sliced from the CC0 "2D Platformer Jungle Pack" by Tio Aimar
   // (opengameart.org/content/2d-platformer-jungle-pack).
@@ -581,6 +583,20 @@ export const INITIAL_SPRITES: SpriteDef[] = [
   { id: 'tiger', name: 'Shere Khan (Prowling)', kind: 'character', width: 140, height: 90, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/tiger-${n}.png`), frameDuration: 160 },
   { id: 'mowgli_torch', name: 'Mowgli (Torch Duel)', kind: 'character', width: 90, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/mowgli-torch-${n}.png`), frameDuration: 170 },
   { id: 'shere_khan', name: 'Shere Khan (Duel)', kind: 'character', width: 160, height: 115, frames: [1, 2, 3, 4].map((n) => `/assets/sprites/shere-khan-${n}.png`), frameDuration: 170 },
+];
+
+// The night group: a copy of every day sprite pointing at 30%-darkened
+// variants of the bundled art (pre-rendered in /assets/sprites/night).
+// Missions with spriteSet 'night' resolve their sprites through these first
+// (empty night frames fall back to the day sprite, then to procedural art).
+export const INITIAL_SPRITES: SpriteDef[] = [
+  ...DAY_SPRITES,
+  ...DAY_SPRITES.map((s) => ({
+    ...s,
+    id: NIGHT_SPRITE_PREFIX + s.id,
+    name: `${s.name} (Night)`,
+    frames: s.frames.map((f) => f.replace('/assets/sprites/', '/assets/sprites/night/')),
+  })),
 ];
 
 export const INITIAL_SETTINGS = {

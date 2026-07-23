@@ -803,6 +803,7 @@ export default function GameCanvas({
     // chosen preset's layered assets, then a procedural fallback.
     const customBg = level.backgroundImage ? getImageFromDataUrl(level.backgroundImage) : null;
     const preset = LEVEL_BACKGROUNDS[level.background ?? 'jungle'] ?? LEVEL_BACKGROUNDS.jungle;
+    const spriteSet = level.spriteSet ?? 'day';
     const skyImg = getImage(preset.sky);
     const farImg = getImage(preset.far);
     const nearImg = getImage(preset.near);
@@ -894,7 +895,7 @@ export default function GameCanvas({
 
       // Sprite override: a custom placed sprite, or an uploaded image on the
       // platform's built-in type sprite, replaces the procedural texture.
-      const platSprite = findSprite(sprites, plat.spriteId) ?? findSprite(sprites, plat.type);
+      const platSprite = findSprite(sprites, plat.spriteId, spriteSet) ?? findSprite(sprites, plat.type, spriteSet);
       const platImg = platSprite ? spriteImage(platSprite, performance.now()) : null;
       const extendsDown = platformExtendsDown(plat);
 
@@ -1042,7 +1043,7 @@ export default function GameCanvas({
       ctx.scale(scaleX, scaleY);
 
       // Sprite override — drawn inside the squish transform so it still squashes
-      const toadSprite = findSprite(sprites, 'toad');
+      const toadSprite = findSprite(sprites, 'toad', spriteSet);
       const toadImg = toadSprite ? spriteImage(toadSprite, performance.now()) : null;
       if (toadSprite && toadImg) {
         ctx.drawImage(toadImg, -toadSprite.width / 2, -toadSprite.height, toadSprite.width, toadSprite.height);
@@ -1100,7 +1101,7 @@ export default function GameCanvas({
       const bobY = col.y + Math.sin((s.frameId + col.bobOffset) / 10) * 3.5;
 
       // Sprite override — keeps the bobbing motion
-      const colSprite = findSprite(sprites, col.type);
+      const colSprite = findSprite(sprites, col.type, spriteSet);
       const colImg = colSprite ? spriteImage(colSprite, performance.now()) : null;
       if (colSprite && colImg) {
         ctx.drawImage(colImg, col.x - colSprite.width / 2, bobY - colSprite.height / 2, colSprite.width, colSprite.height);
@@ -1149,7 +1150,7 @@ export default function GameCanvas({
     const portalX = level.endX;
     const portalY = level.endY;
 
-    const portalSprite = findSprite(sprites, 'portal');
+    const portalSprite = findSprite(sprites, 'portal', spriteSet);
     const portalImg = portalSprite ? spriteImage(portalSprite, performance.now()) : null;
     if (portalSprite && portalImg) {
       // Sprite override — anchored to the portal's pillar base
@@ -1200,7 +1201,7 @@ export default function GameCanvas({
 
     // 7. Draw MOWGLI character! (sprite frames animate while running)
     if (s.deathTimer === 0) {
-      const mowgliSprite = findSprite(sprites, 'mowgli');
+      const mowgliSprite = findSprite(sprites, 'mowgli', spriteSet);
       const mowgliImg = mowgliSprite
         ? spriteImage(mowgliSprite, p.state === 'idle' ? null : performance.now())
         : null;

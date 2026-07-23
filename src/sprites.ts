@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Platform, SpriteDef } from './types';
+import { NIGHT_SPRITE_PREFIX, Platform, SpriteDef, SpriteSet } from './types';
 import { getImageFromDataUrl } from './assets';
 
 /**
@@ -20,9 +20,20 @@ export function platformExtendsDown(plat: Platform): boolean {
  * Look a sprite up by id, but only when it actually has uploaded frames —
  * callers fall back to their original procedural canvas art otherwise, so an
  * untouched sprite library changes nothing visually.
+ *
+ * With `set` 'night' the darkened night variant (id `night_<id>`) is tried
+ * first; a night sprite without frames falls back to the day sprite.
  */
-export function findSprite(sprites: SpriteDef[], id: string | undefined): SpriteDef | undefined {
+export function findSprite(
+  sprites: SpriteDef[],
+  id: string | undefined,
+  set: SpriteSet = 'day',
+): SpriteDef | undefined {
   if (!id) return undefined;
+  if (set === 'night') {
+    const night = sprites.find((sp) => sp.id === NIGHT_SPRITE_PREFIX + id);
+    if (night && night.frames.length > 0) return night;
+  }
   const s = sprites.find((sp) => sp.id === id);
   return s && s.frames.length > 0 ? s : undefined;
 }

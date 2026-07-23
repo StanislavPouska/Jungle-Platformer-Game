@@ -189,6 +189,11 @@ export interface TriggerPlacement {
   chapterCard?: ChapterId;    // optionally show a chapter title card before launching
 }
 
+// Which sprite-library group a mission renders with. 'night' makes every
+// sprite lookup prefer the darkened night variant (id `night_<baseId>`),
+// falling back to the day sprite when no night variant has frames.
+export type SpriteSet = 'day' | 'night';
+
 interface MissionBase {
   id: number;
   name: string;
@@ -197,6 +202,7 @@ interface MissionBase {
   triggers: TriggerPlacement[];
   background?: LevelBackgroundId;   // preset art set (defaults per type)
   backgroundImage?: string;         // optional custom image (data URL) — overrides the preset
+  spriteSet?: SpriteSet;            // sprite group used for rendering (default 'day')
 }
 
 export interface PlatformerMission extends MissionBase {
@@ -233,6 +239,9 @@ export type Mission = PlatformerMission | StealthMission;
 // missions as platforms.
 
 export type SpriteKind = 'block' | 'character';
+
+/** Id prefix marking a sprite as the night variant of `<baseId>`. */
+export const NIGHT_SPRITE_PREFIX = 'night_';
 
 export interface SpriteDef {
   id: string;

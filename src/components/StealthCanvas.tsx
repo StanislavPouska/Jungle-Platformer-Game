@@ -675,7 +675,7 @@ export default function StealthCanvas({
 
   const drawToddler = (ctx: CanvasRenderingContext2D, p: typeof stateRef.current.player) => {
     // Sprite override — frames animate while crawling
-    const spr = findSprite(sprites, 'baby_mowgli');
+    const spr = findSprite(sprites, 'baby_mowgli', prologue.spriteSet ?? 'day');
     const img = spr ? spriteImage(spr, Math.abs(p.vx) > 0.1 ? performance.now() : null) : null;
     if (spr && img) {
       drawSpriteImage(ctx, img, p.x + PLAYER_W / 2, p.y + 2, spr.width, spr.height, p.facing === 'left');
@@ -736,7 +736,7 @@ export default function StealthCanvas({
     const wiggle = sniffing ? Math.sin((s.frameId ?? 0) / 4) * 3 : 0;
 
     // Sprite override — the prowl is always in motion, so always animate
-    const spr = findSprite(sprites, 'tiger');
+    const spr = findSprite(sprites, 'tiger', prologue.spriteSet ?? 'day');
     const img = spr ? spriteImage(spr, performance.now()) : null;
     if (spr && img) {
       drawSpriteImage(ctx, img, tiger.x + wiggle, tiger.y + 14, spr.width, spr.height, tiger.dir < 0);
