@@ -93,6 +93,29 @@ export function getImageFromDataUrl(url: string): HTMLImageElement | null {
 }
 
 /**
+ * Kick off decoding for the given image URLs (through the shared cache) and
+ * resolve once every one is ready — or after `timeoutMs`, so a missing file
+ * can never hold the game hostage. Canvases await this before their first
+ * frame to keep the procedural fallback art from flashing at level start
+ * while sprites are still decoding.
+ */
+export function decodeImageUrls(urls: string[], timeoutMs = 1500): Promise<void> {
+  if (typeof window === 'undefined') return Promise.resolve();
+  const unique = [...new Set(urls.filter(Boolean))];
+  const jobs = unique.map((url) => {
+    getImageFromDataUrl(url); // ensure it's cached and loading
+    const img = dataUrlCache.get(url);
+    if (!img || img.complete) return Promise.resolve();
+    return new Promise<void>((resolve) => {
+      img.addEventListener('load', () => resolve(), { once: true });
+      img.addEventListener('error', () => resolve(), { once: true });
+    });
+  });
+  const timeout = new Promise<void>((resolve) => setTimeout(resolve, timeoutMs));
+  return Promise.race([Promise.all(jobs).then(() => undefined), timeout]);
+}
+
+/**
  * Tile an image horizontally across the viewport at a parallax offset. Drawn in
  * the pre-camera (screen) space, so `scrollX` is the already-scaled parallax
  * amount. Each tile is drawn at `tileW`×`drawH` starting at `y`.

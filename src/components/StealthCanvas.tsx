@@ -10,7 +10,7 @@ import { Landmark, RotateCcw, Play } from 'lucide-react';
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
 import { findSprite, spriteImage, drawSpriteImage } from '../sprites';
-import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, decodeImageUrls, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
 preloadAssets();
@@ -170,7 +170,20 @@ export default function StealthCanvas({
     audioSynth.startJungleMusic();
   }, [prologue]);
 
+  // Hold the first frame until the sprite art has decoded — otherwise the
+  // procedural fallback graphics flash briefly at level start.
+  const [assetsReady, setAssetsReady] = useState(false);
   useEffect(() => {
+    let alive = true;
+    setAssetsReady(false);
+    const urls = sprites.flatMap((sp) => sp.frames);
+    if (prologue.backgroundImage) urls.push(prologue.backgroundImage);
+    decodeImageUrls(urls).then(() => { if (alive) setAssetsReady(true); });
+    return () => { alive = false; };
+  }, [sprites, prologue]);
+
+  useEffect(() => {
+    if (!assetsReady) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -422,7 +435,7 @@ export default function StealthCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [prologue, paused, escaped, activeTrigger, questionPool, sprites]);
+  }, [prologue, paused, escaped, activeTrigger, questionPool, sprites, assetsReady]);
 
   // ---- trigger gate resolutions ---------------------------------------------
   const closeGate = () => {

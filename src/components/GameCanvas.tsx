@@ -24,7 +24,7 @@ import { Play, RotateCcw, Volume2, Landmark, Trophy, PlayCircle } from 'lucide-r
 import { Lang, UI, getMissionText } from '../i18n';
 import { pickQuizQuestions } from '../quiz';
 import { findSprite, spriteImage, drawSpriteImage, platformExtendsDown } from '../sprites';
-import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, LEVEL_BACKGROUNDS } from '../assets';
+import { preloadAssets, getImage, tileParallax, getImageFromDataUrl, decodeImageUrls, LEVEL_BACKGROUNDS } from '../assets';
 import GateOverlays from './GateOverlays';
 
 preloadAssets();
@@ -204,8 +204,21 @@ export default function GameCanvas({
     };
   }, [level, settings.doubleJumpEnabled, stats.currentLevel, stats.gameState]);
 
+  // Hold the first frame until the sprite art has decoded — otherwise the
+  // procedural fallback graphics flash briefly at level start.
+  const [assetsReady, setAssetsReady] = useState(false);
+  useEffect(() => {
+    let alive = true;
+    setAssetsReady(false);
+    const urls = sprites.flatMap((sp) => sp.frames);
+    if (level.backgroundImage) urls.push(level.backgroundImage);
+    decodeImageUrls(urls).then(() => { if (alive) setAssetsReady(true); });
+    return () => { alive = false; };
+  }, [sprites, level]);
+
   // Main Loop Setup
   useEffect(() => {
+    if (!assetsReady) return;
     // Canvas context
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -400,7 +413,7 @@ export default function GameCanvas({
       window.removeEventListener('resize', resizeCanvas);
       resizeObserver.disconnect();
     };
-  }, [level, paused, settings, activeTrigger, language, questionPool, sprites]);
+  }, [level, paused, settings, activeTrigger, language, questionPool, sprites, assetsReady]);
 
   // Core Physics state engine mimicking standard 2D Pygame physics
   const updatePhysics = (s: any, env: GameSettings) => {
