@@ -592,10 +592,12 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
   const selTrigger = selected?.kind === 'trigger' ? mission.triggers.find((tr) => tr.id === selected.id) : undefined;
 
   // ---- palette descriptors ---------------------------------------------------------
-  // User-created block sprites become extra palette entries (the built-in
-  // block sprites already appear via the platform/creature/collectible groups).
+  // Block sprites without a dedicated palette entry (props + user-created
+  // blocks) get their own placeable entries; the classic platform types,
+  // creatures and pickups already appear via their groups below.
+  const dedicatedPaletteIds = ['moss_log', 'jungle_brick', 'vine_bridge', 'canopy_leaves', 'toad', 'banana', 'mango', 'star', 'portal'];
   const customBlockSprites = world.sprites.filter(
-    (s) => s.kind === 'block' && !INITIAL_SPRITES.some((d) => d.id === s.id),
+    (s) => s.kind === 'block' && !dedicatedPaletteIds.includes(s.id),
   );
 
   const platformPalette: { item: PaletteItem; label: string; color: string }[] = [
@@ -1380,6 +1382,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
               >
                 <option value="jungle">{t.editorBgJungle}</option>
                 <option value="night_raid">{t.editorBgNightRaid}</option>
+                <option value="deep_jungle">{t.editorBgDeepJungle}</option>
               </select>
             </label>
             <input ref={fileInputRef} type="file" accept="image/*" className="hidden" id="editor-bg-file" onChange={(e) => { handleBgFile(e.target.files?.[0]); e.target.value = ''; }} />

@@ -19,6 +19,10 @@ export const ASSET_PATHS: Record<string, string> = {
   bgPrologueSky: '/assets/bg-prologue-sky.svg',
   bgPrologueFar: '/assets/bg-prologue-far.svg',
   bgPrologueNear: '/assets/bg-prologue-near.svg',
+  // Backgrounds (Misty jungle — CC0 art by Tio Aimar, opengameart.org)
+  bgDeepSky: '/assets/bg-deep-sky.png',
+  bgDeepFar: '/assets/bg-deep-far.png',
+  bgDeepNear: '/assets/bg-deep-near.png',
 };
 
 // Named background presets → the three parallax layer keys in ASSET_PATHS.
@@ -30,6 +34,7 @@ export const LEVEL_BACKGROUNDS: Record<
 > = {
   jungle: { sky: 'bgSky', far: 'bgCanopyFar', near: 'bgCanopyNear' },
   night_raid: { sky: 'bgPrologueSky', far: 'bgPrologueFar', near: 'bgPrologueNear' },
+  deep_jungle: { sky: 'bgDeepSky', far: 'bgDeepFar', near: 'bgDeepNear' },
 };
 
 const cache: Record<string, HTMLImageElement> = {};

@@ -84,7 +84,7 @@ export type ChapterId = 'prologue' | 'ch1' | 'ch2' | 'epilogue';
 
 // Background art for a mission. Presets reference the layered SVG sets already
 // shipped in /public/assets; a per-mission custom image (data URL) overrides them.
-export type LevelBackgroundId = 'jungle' | 'night_raid';
+export type LevelBackgroundId = 'jungle' | 'night_raid' | 'deep_jungle';
 
 // --- Stealth-mission building blocks: a crawling stage with its own
 // simplified movement model (no gravity or jumping — the toddler Mowgli
