@@ -187,6 +187,11 @@ export default function App() {
     });
   };
 
+  const handleEditorSave = () => {
+    // Force any pending debounced saves to execute immediately
+    flushWorldSave();
+  };
+
   // Reload current mission
   const handleRestartLevel = () => {
     setStats((prev) => ({
@@ -434,6 +439,7 @@ export default function App() {
             world={world}
             onWorldChange={handleEditorWorldChange}
             onPlaytest={handlePlaytestLevel}
+            onSave={handleEditorSave}
             language={language}
           />
         ) : activeTab === 'game' ? (

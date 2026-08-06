@@ -116,6 +116,7 @@ interface LevelEditorProps {
   world: WorldData;
   onWorldChange: (next: WorldData) => void;
   onPlaytest: (index: number) => void;
+  onSave?: () => void;
   language: Lang;
 }
 
@@ -203,7 +204,7 @@ function PaletteButton({ item, label, color, icon, armed, onToggle }: { item: Pa
 
 type EditorMode = 'missions' | 'fights' | 'quizzes' | 'sprites';
 
-export default function LevelEditor({ world, onWorldChange, onPlaytest, language }: LevelEditorProps) {
+export default function LevelEditor({ world, onWorldChange, onPlaytest, onSave, language }: LevelEditorProps) {
   const t = UI[language];
   const [mode, setMode] = useState<EditorMode>('missions');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -591,6 +592,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
   // ---- save/export ---------------------------------------------------------------
   const handleSave = () => {
     // Trigger the app's autosave and show feedback
+    onSave?.();
     setSaveConfirm(true);
     setTimeout(() => setSaveConfirm(false), 2000);
   };

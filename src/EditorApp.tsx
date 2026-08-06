@@ -80,6 +80,11 @@ export default function EditorApp() {
     window.location.href = `index.html?play=${idx}`;
   };
 
+  const handleSave = () => {
+    // Force any pending debounced saves to execute immediately
+    flushWorldSave();
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 font-sans px-4 md:px-6 py-5 select-none">
       <div className="w-full max-w-[1700px] mx-auto space-y-5">
@@ -117,7 +122,7 @@ export default function EditorApp() {
           </div>
         </header>
 
-        <LevelEditor world={world} onWorldChange={handleWorldChange} onPlaytest={handlePlaytest} language={language} />
+        <LevelEditor world={world} onWorldChange={handleWorldChange} onPlaytest={handlePlaytest} onSave={handleSave} language={language} />
       </div>
     </div>
   );
