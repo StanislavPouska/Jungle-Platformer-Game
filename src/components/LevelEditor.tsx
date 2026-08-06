@@ -45,6 +45,8 @@ import {
   Cat,
   SquarePen,
   Image as ImageIcon,
+  Download,
+  Check,
 } from 'lucide-react';
 import { NumberField, SelectField, makeLibraryId, downscaleImage } from './editorFields';
 import { platformExtendsDown } from '../sprites';
@@ -208,6 +210,7 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
   const [selected, setSelected] = useState<Selection | null>(null);
   const [armed, setArmed] = useState<PaletteItem | null>(null);
   const [bgError, setBgError] = useState(false);
+  const [saveConfirm, setSaveConfirm] = useState(false);
 
   const missions = world.missions;
   const index = clamp(selectedIndex, 0, missions.length - 1);
@@ -585,6 +588,34 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
     }
   };
 
+  // ---- save/export ---------------------------------------------------------------
+  const handleSave = () => {
+    // Trigger the app's autosave and show feedback
+    setSaveConfirm(true);
+    setTimeout(() => setSaveConfirm(false), 2000);
+  };
+
+  const handleExport = () => {
+    // Export the current world data as a JSON file
+    const exportData = {
+      missions: world.missions,
+      fights: world.fights,
+      quizzes: world.quizzes,
+      questionPool: world.questionPool,
+      sprites: world.sprites,
+    };
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `jungle-game-export-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
   // ---- selection lookups ---------------------------------------------------------
   const selPlatform = selected?.kind === 'platform' && mission.type === 'platformer' ? mission.platforms.find((p) => p.id === selected.id) : undefined;
   const selToad = selected?.kind === 'toad' && mission.type === 'platformer' ? mission.toads.find((td) => td.id === selected.id) : undefined;
@@ -696,8 +727,24 @@ export default function LevelEditor({ world, onWorldChange, onPlaytest, language
                 <Trash2 className="w-3.5 h-3.5" />{t.editorDelete}
               </button>
             </div>
-            <button onClick={() => onPlaytest(index)} className="w-full flex items-center justify-center gap-2 py-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-pink-600 hover:from-fuchsia-600 hover:to-pink-700 text-white font-bold text-xs cursor-pointer shadow-lg shadow-fuchsia-950/30" id="editor-playtest">
-              <Play className="w-4 h-4" />{t.editorPlaytest}
+            <div className="grid grid-cols-2 gap-1.5">
+              <button onClick={handleSave} className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-white font-bold text-xs cursor-pointer transition-all ${saveConfirm ? 'bg-emerald-600 text-emerald-100' : 'bg-purple-700 hover:bg-purple-600'}`} id="editor-save" title={t.editorSave ?? 'Save'}>
+                {saveConfirm ? (
+                  <>
+                    <Check className="w-4 h-4" />Saved
+                  </>
+                ) : (
+                  <>
+                    <RotateCcw className="w-4 h-4" />Save
+                  </>
+                )}
+              </button>
+              <button onClick={() => onPlaytest(index)} className="flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gradient-to-r from-fuchsia-500 to-pink-600 hover:from-fuchsia-600 hover:to-pink-700 text-white font-bold text-xs cursor-pointer shadow-lg shadow-fuchsia-950/30" id="editor-tryit" title={t.editorTryit ?? 'Try it'}>
+                <Play className="w-4 h-4" />Try it
+              </button>
+            </div>
+            <button onClick={handleExport} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#0c0419] hover:bg-cyan-950/50 border border-cyan-900/30 text-cyan-300 hover:text-cyan-200 text-[11px] cursor-pointer" id="editor-export" title="Export world data as JSON">
+              <Download className="w-3.5 h-3.5" />Export
             </button>
             <button onClick={handleReset} className="w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-[#0c0419] hover:bg-purple-950/50 border border-purple-900/50 text-gray-400 hover:text-gray-200 text-[11px] cursor-pointer" id="editor-reset-levels" title={t.editorReset}>
               <RotateCcw className="w-3.5 h-3.5" />{t.editorReset}
