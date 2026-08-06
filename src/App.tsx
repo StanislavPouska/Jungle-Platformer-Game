@@ -4,12 +4,11 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SPRITES, INITIAL_SETTINGS } from './data';
+import { INITIAL_SETTINGS } from './data';
 import { GameStats, GameSettings, WorldData, ChapterId } from './types';
 import GameCanvas from './components/GameCanvas';
 import MainMenu from './components/MainMenu';
 import StealthCanvas from './components/StealthCanvas';
-import LevelEditor from './components/LevelEditor';
 import ChapterCard from './components/ChapterCard';
 import {
   Trees,
@@ -23,7 +22,7 @@ import {
   Info,
   Menu as MenuIcon,
   Skull,
-  SquarePen
+  Loader2,
 } from 'lucide-react';
 import { audioSynth } from './audio';
 import { Lang, UI, getMissionText } from './i18n';
@@ -32,17 +31,14 @@ import {
   SaveData,
   readSaveData,
   readSavedLang,
-  mergeWithDefaults,
   writeSaveData,
-  scheduleWorldSave,
-  flushWorldSave,
 } from './storage';
-
-const initialWorld = (): WorldData =>
-  JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS, sprites: INITIAL_SPRITES }));
+import { loadWorldForGame } from './worldFile';
 
 export default function App() {
-  const [world, setWorld] = useState<WorldData>(initialWorld);
+  // Level design lives in a file on disk (public/world.json), edited by the
+  // standalone editor. The game loads it at startup; null while it's fetching.
+  const [world, setWorld] = useState<WorldData | null>(null);
   const [settings, setSettings] = useState<GameSettings>(INITIAL_SETTINGS);
 
   const [stats, setStats] = useState<GameStats>({
@@ -54,7 +50,7 @@ export default function App() {
     gameState: 'start_screen'
   });
 
-  const [activeTab, setActiveTab] = useState<'game' | 'help' | 'editor'>('game');
+  const [activeTab, setActiveTab] = useState<'game' | 'help'>('game');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
   const [saveData, setSaveData] = useState<SaveData | null>(() => readSaveData());
@@ -64,13 +60,20 @@ export default function App() {
   const [activeChapter, setActiveChapter] = useState<ChapterId | null>(null);
   const [chapterCard, setChapterCard] = useState<ChapterId | null>(null);
   const [pendingStage, setPendingStage] = useState<number | null>(null);
+  // A ?play=N deep-link (from the editor's Playtest) is applied once the world
+  // has loaded from the file.
+  const [pendingPlay, setPendingPlay] = useState<number | null>(null);
 
   const t = UI[language];
-  const missions = world.missions;
+  const missions = world?.missions ?? [];
   // Clamp in case the editor deleted the mission the game was sitting on.
   const currentIndex = Math.min(stats.currentLevel, missions.length - 1);
   const currentMission = missions[currentIndex];
-  const currentMissionText = getMissionText(currentMission, language);
+  // Safe during the brief loading window before the world file resolves; the
+  // game body that reads this only renders once a mission is present.
+  const currentMissionText = currentMission
+    ? getMissionText(currentMission, language)
+    : { name: '', description: '' };
 
   const handleLanguageChange = (lang: Lang) => {
     setLanguage(lang);
@@ -92,37 +95,35 @@ export default function App() {
     return () => window.removeEventListener('keydown', handleEsc);
   }, [stats.gameState]);
 
-  // Standalone editor "Playtest" navigates here with ?play=N — load the world
-  // the editor saved (merged against the built-in set, same as Load) and jump
-  // straight into mission N via the shared launch path, then strip the param.
+  // Load the level design from the world file on startup. A ?play=N deep-link
+  // (from the standalone editor's Playtest) is captured now and applied once
+  // the world has resolved, then stripped from the URL.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const playRaw = params.get('play');
-    if (playRaw === null) return;
-    const saved = readSaveData();
-    const sourceWorld = saved?.world?.missions?.length
-      ? mergeWithDefaults(saved.world, saved.knownDefaults)
-      : world;
-    if (saved?.world?.missions?.length) setWorld(sourceWorld);
-    const idx = parseInt(playRaw, 10);
-    const safeIdx = Number.isFinite(idx) ? Math.max(0, Math.min(idx, sourceWorld.missions.length - 1)) : 0;
-    setActiveTab('game');
-    launchStage(safeIdx, sourceWorld);
-    params.delete('play');
-    const qs = params.toString();
-    window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    if (playRaw !== null) {
+      const idx = parseInt(playRaw, 10);
+      setPendingPlay(Number.isFinite(idx) ? Math.max(0, idx) : 0);
+      params.delete('play');
+      const qs = params.toString();
+      window.history.replaceState({}, '', window.location.pathname + (qs ? `?${qs}` : ''));
+    }
+    loadWorldForGame().then((w) => setWorld(w));
   }, []);
 
-  // Editor autosaves are debounced — force any pending write out before the
-  // page goes away so the last few edits aren't lost.
+  // Once the world is loaded, honor any pending Playtest deep-link.
   useEffect(() => {
-    const flush = () => flushWorldSave();
-    window.addEventListener('beforeunload', flush);
-    return () => window.removeEventListener('beforeunload', flush);
-  }, []);
+    if (!world || pendingPlay === null) return;
+    const safeIdx = Math.max(0, Math.min(pendingPlay, world.missions.length - 1));
+    setPendingPlay(null);
+    setActiveTab('game');
+    launchStage(safeIdx, world);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [world, pendingPlay]);
 
   // Launch a mission immediately (no chapter card).
-  const launchStage = (index: number, inWorld: WorldData = world) => {
+  const launchStage = (index: number, inWorld: WorldData | null = world) => {
+    if (!inWorld) return;
     setMenuOpen(false);
     setChapterCard(null);
     setPendingStage(null);
@@ -165,31 +166,6 @@ export default function App() {
   // Skip or change mission directly from the sidebar
   const handleSelectMission = (idx: number) => {
     requestStage(idx);
-  };
-
-  // Playtest a mission from the in-app editor tab — jump straight into it.
-  const handlePlaytestLevel = (idx: number) => {
-    flushWorldSave(); // persist any pending editor autosave before playing
-    setActiveTab('game');
-    launchStage(idx);
-  };
-
-  // In-app editor writes: update state, keep the running mission index valid
-  // if missions were deleted, and autosave (debounced) so editor work survives
-  // a refresh — mirroring the standalone editor's behavior.
-  const handleEditorWorldChange = (next: WorldData) => {
-    setWorld(next);
-    setStats((prev) =>
-      prev.currentLevel >= next.missions.length ? { ...prev, currentLevel: next.missions.length - 1 } : prev,
-    );
-    scheduleWorldSave(next, (data) => {
-      if (data) setSaveData(data);
-    });
-  };
-
-  const handleEditorSave = () => {
-    // Force any pending debounced saves to execute immediately
-    flushWorldSave();
   };
 
   // Reload current mission
@@ -248,9 +224,11 @@ export default function App() {
     setChapterCard(missions[0]?.chapter ?? 'ch1');
   };
 
-  // Persist current run to localStorage (stamps knownDefaults so future
-  // merges can tell "new built-in content" apart from "deliberately deleted")
+  // Persist current run progress to localStorage. Level design is NOT saved
+  // here — it lives in the game's world file (edited by the standalone editor);
+  // localStorage only carries the player's progress and settings.
   const handleSaveGame = () => {
+    if (!world) return;
     const data = writeSaveData({
       stats,
       settings,
@@ -260,21 +238,19 @@ export default function App() {
     if (data) setSaveData(data);
   };
 
-  // Restore a previously saved run — resume directly, no chapter card.
-  // The world is merged against the built-in set so an old/partial save never
-  // hides content (the same recovery the standalone editor does).
+  // Restore a previously saved run — resume directly, no chapter card. The
+  // level design always comes from the current world file; only progress and
+  // settings are restored from localStorage.
   const handleLoadGame = () => {
     const data = readSaveData();
-    if (!data) return;
-    const mergedWorld = mergeWithDefaults(data.world, data.knownDefaults);
-    const safeLevel = Math.min(data.stats.currentLevel, mergedWorld.missions.length - 1);
-    setWorld(mergedWorld);
+    if (!data || !world) return;
+    const safeLevel = Math.min(data.stats.currentLevel, world.missions.length - 1);
     setSettings(data.settings);
     setStats({ ...data.stats, currentLevel: safeLevel, gameState: 'playing' });
     setSaveData(data);
     setChapterCard(null);
     setPendingStage(null);
-    setActiveChapter(mergedWorld.missions[safeLevel]?.chapter ?? null);
+    setActiveChapter(world.missions[safeLevel]?.chapter ?? null);
     setMenuOpen(false);
   };
 
@@ -282,6 +258,19 @@ export default function App() {
 
   const isStartScreen = stats.gameState === 'start_screen';
   const isPausedByMenu = menuOpen || stats.gameState === 'paused';
+
+  // Level design is loaded from the world file at startup; hold a spinner until
+  // it resolves so nothing renders against an empty mission list.
+  if (!world) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-fuchsia-300 font-mono text-sm">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading…
+        </div>
+      </div>
+    );
+  }
 
   if (isStartScreen) {
     return (
@@ -416,33 +405,13 @@ export default function App() {
               >
                 {t.tabHelp}
               </button>
-              <button
-                onClick={() => setActiveTab('editor')}
-                className={`flex items-center gap-1 px-4 py-1.5 text-xs font-mono rounded-lg transition-all ${
-                  activeTab === 'editor'
-                  ? 'bg-gradient-to-r from-fuchsia-500 to-pink-600 text-white font-bold shadow-[0_0_12px_rgba(236,72,153,0.35)]'
-                  : 'text-gray-400 hover:text-white'
-                } cursor-pointer`}
-                id="tab-editor"
-              >
-                <SquarePen className="w-3.5 h-3.5" />
-                {t.tabEditor}
-              </button>
             </nav>
           </div>
 
         </header>
 
         {/* Main Body */}
-        {activeTab === 'editor' ? (
-          <LevelEditor
-            world={world}
-            onWorldChange={handleEditorWorldChange}
-            onPlaytest={handlePlaytestLevel}
-            onSave={handleEditorSave}
-            language={language}
-          />
-        ) : activeTab === 'game' ? (
+        {activeTab === 'game' ? (
           <div className="flex flex-col xl:flex-row gap-6 items-start justify-center">
 
             {/* Left sidebar - Mission List Selector */}

@@ -1,0 +1,2529 @@
+{
+  "missions": [
+    {
+      "id": 0,
+      "type": "stealth",
+      "chapter": "prologue",
+      "name": "Shere Khan's Raid",
+      "description": "Shere Khan has attacked the village! As a crawling toddler, Mowgli must creep through the jungle, ducking into caves and leaf-shadows to hide from the prowling tiger.",
+      "background": "night_raid",
+      "spriteSet": "night",
+      "triggers": [],
+      "startX": 60,
+      "levelMinX": 20,
+      "levelMaxX": 2340,
+      "platforms": [
+        {
+          "id": "sp1",
+          "x": 30,
+          "width": 220,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp2",
+          "x": 250,
+          "width": 180,
+          "y": 400,
+          "height": 30
+        },
+        {
+          "id": "sp3",
+          "x": 430,
+          "width": 190,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp4",
+          "x": 620,
+          "width": 170,
+          "y": 440,
+          "height": 30
+        },
+        {
+          "id": "sp5",
+          "x": 790,
+          "width": 200,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp6",
+          "x": 990,
+          "width": 180,
+          "y": 400,
+          "height": 30
+        },
+        {
+          "id": "sp7",
+          "x": 1170,
+          "width": 190,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp8",
+          "x": 1360,
+          "width": 170,
+          "y": 440,
+          "height": 30
+        },
+        {
+          "id": "sp9",
+          "x": 1530,
+          "width": 200,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp10",
+          "x": 1730,
+          "width": 180,
+          "y": 400,
+          "height": 30
+        },
+        {
+          "id": "sp11",
+          "x": 1910,
+          "width": 190,
+          "y": 420,
+          "height": 30
+        },
+        {
+          "id": "sp12",
+          "x": 2100,
+          "width": 240,
+          "y": 410,
+          "height": 30
+        }
+      ],
+      "hidingSpots": [
+        {
+          "id": "hs1",
+          "x": 330,
+          "y": 400,
+          "width": 70,
+          "height": 70,
+          "kind": "cave"
+        },
+        {
+          "id": "hs2",
+          "x": 700,
+          "y": 440,
+          "width": 70,
+          "height": 70,
+          "kind": "leaf_shadow"
+        },
+        {
+          "id": "hs3",
+          "x": 1080,
+          "y": 400,
+          "width": 70,
+          "height": 70,
+          "kind": "cave"
+        },
+        {
+          "id": "hs4",
+          "x": 1450,
+          "y": 440,
+          "width": 70,
+          "height": 70,
+          "kind": "leaf_shadow"
+        },
+        {
+          "id": "hs5",
+          "x": 1820,
+          "y": 400,
+          "width": 70,
+          "height": 70,
+          "kind": "cave"
+        },
+        {
+          "id": "goal",
+          "x": 2200,
+          "y": 410,
+          "width": 110,
+          "height": 95,
+          "kind": "goal_cave"
+        }
+      ],
+      "goalSpotId": "goal",
+      "tigerStartX": 480,
+      "tigerSpeed": 1.8
+    },
+    {
+      "id": 1,
+      "name": "Canopy Crossing",
+      "description": "Jump across ancient moss logs and bounce on helpful Green Toads to cross the jungle sky!",
+      "startX": 100,
+      "startY": 350,
+      "endX": 1900,
+      "endY": 250,
+      "platforms": [
+        {
+          "id": "l1-p1",
+          "x": 50,
+          "y": 400,
+          "width": 250,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l1-p2",
+          "x": 400,
+          "y": 320,
+          "width": 180,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l1-p3",
+          "x": 250,
+          "y": 520,
+          "width": 500,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l1-p4",
+          "x": 670,
+          "y": 250,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l1-p5",
+          "x": 900,
+          "y": 420,
+          "width": 350,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l1-p6",
+          "x": 1350,
+          "y": 450,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l1-p7",
+          "x": 1200,
+          "y": 300,
+          "width": 220,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l1-p9",
+          "x": 1420,
+          "y": 200,
+          "width": 220,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l1-p8",
+          "x": 1750,
+          "y": 320,
+          "width": 250,
+          "height": 40,
+          "type": "moss_log"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l1-t1",
+          "x": 1050,
+          "y": 400,
+          "width": 44,
+          "height": 24,
+          "springForce": 15,
+          "color": "#4ade80",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l1-t2",
+          "x": 1430,
+          "y": 430,
+          "width": 44,
+          "height": 24,
+          "springForce": 21,
+          "color": "#22c55e",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l1-c1",
+          "x": 180,
+          "y": 320,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l1-c2",
+          "x": 490,
+          "y": 230,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 120
+        },
+        {
+          "id": "l1-c3",
+          "x": 740,
+          "y": 170,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 240
+        },
+        {
+          "id": "l1-c4",
+          "x": 980,
+          "y": 330,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 60
+        },
+        {
+          "id": "l1-c5",
+          "x": 1520,
+          "y": 120,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 180
+        },
+        {
+          "id": "l1-c6",
+          "x": 1850,
+          "y": 240,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 300
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch1",
+      "triggers": []
+    },
+    {
+      "id": 2,
+      "name": "Mystic Swamplands",
+      "description": "Avoid the deep muddy marsh bottom! Timely jumps onto moving vine-bridges and toxic red bouncy Toads are required.",
+      "startX": 100,
+      "startY": 300,
+      "endX": 2150,
+      "endY": 280,
+      "platforms": [
+        {
+          "id": "l2-p1",
+          "x": 50,
+          "y": 380,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l2-p2",
+          "x": 380,
+          "y": 280,
+          "width": 140,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l2-p3",
+          "x": 600,
+          "y": 340,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 600,
+          "startY": 340,
+          "range": 220,
+          "speed": 2
+        },
+        {
+          "id": "l2-p4",
+          "x": 950,
+          "y": 420,
+          "width": 160,
+          "height": 180,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l2-p5",
+          "x": 1000,
+          "y": 220,
+          "width": 140,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l2-p6",
+          "x": 1250,
+          "y": 280,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 1250,
+          "startY": 200,
+          "range": 180,
+          "speed": 1.5
+        },
+        {
+          "id": "l2-p7",
+          "x": 1550,
+          "y": 460,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l2-p8",
+          "x": 1800,
+          "y": 220,
+          "width": 160,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l2-p9",
+          "x": 2050,
+          "y": 360,
+          "width": 220,
+          "height": 40,
+          "type": "jungle_brick"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l2-t1",
+          "x": 1010,
+          "y": 400,
+          "width": 44,
+          "height": 24,
+          "springForce": 24,
+          "color": "#ef4444",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l2-t2",
+          "x": 1620,
+          "y": 440,
+          "width": 44,
+          "height": 24,
+          "springForce": 18,
+          "color": "#eab308",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l2-c1",
+          "x": 450,
+          "y": 200,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 120
+        },
+        {
+          "id": "l2-c2",
+          "x": 680,
+          "y": 150,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 40
+        },
+        {
+          "id": "l2-c3",
+          "x": 1070,
+          "y": 140,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 90
+        },
+        {
+          "id": "l2-c4",
+          "x": 1320,
+          "y": 110,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 250
+        },
+        {
+          "id": "l2-c5",
+          "x": 1640,
+          "y": 320,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 150
+        },
+        {
+          "id": "l2-c6",
+          "x": 1880,
+          "y": 140,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 310
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch1",
+      "triggers": []
+    },
+    {
+      "id": 3,
+      "name": "Ancient Jungle Ruins",
+      "description": "The ultimate temple trial! Use horizontal moving platforms and consecutive high-momentum Toad jumps to safely reach the ancient altar.",
+      "startX": 100,
+      "startY": 320,
+      "endX": 2450,
+      "endY": 220,
+      "platforms": [
+        {
+          "id": "l3-p1",
+          "x": 50,
+          "y": 410,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l3-p2",
+          "x": 300,
+          "y": 320,
+          "width": 160,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 300,
+          "startY": 320,
+          "range": 250,
+          "speed": 2.5
+        },
+        {
+          "id": "l3-p3",
+          "x": 740,
+          "y": 410,
+          "width": 150,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l3-p4",
+          "x": 980,
+          "y": 240,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves",
+          "moving": true,
+          "startX": 980,
+          "startY": 150,
+          "range": 180,
+          "speed": 1.8
+        },
+        {
+          "id": "l3-p5",
+          "x": 1220,
+          "y": 190,
+          "width": 280,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l3-p6",
+          "x": 1300,
+          "y": 500,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l3-p7",
+          "x": 1600,
+          "y": 400,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 1600,
+          "startY": 400,
+          "range": 200,
+          "speed": 3
+        },
+        {
+          "id": "l3-p8",
+          "x": 1880,
+          "y": 280,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l3-p9",
+          "x": 2120,
+          "y": 480,
+          "width": 140,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l3-p10",
+          "x": 2350,
+          "y": 320,
+          "width": 250,
+          "height": 40,
+          "type": "jungle_brick"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l3-t1",
+          "x": 790,
+          "y": 390,
+          "width": 44,
+          "height": 24,
+          "springForce": 23,
+          "color": "#a855f7",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l3-t2",
+          "x": 1360,
+          "y": 480,
+          "width": 44,
+          "height": 24,
+          "springForce": 25,
+          "color": "#c084fc",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l3-t3",
+          "x": 2170,
+          "y": 460,
+          "width": 44,
+          "height": 24,
+          "springForce": 26,
+          "color": "#f43f5e",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l3-c1",
+          "x": 150,
+          "y": 320,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l3-c2",
+          "x": 500,
+          "y": 150,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 120
+        },
+        {
+          "id": "l3-c3",
+          "x": 810,
+          "y": 220,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 240
+        },
+        {
+          "id": "l3-c4",
+          "x": 1100,
+          "y": 70,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 60
+        },
+        {
+          "id": "l3-c5",
+          "x": 1350,
+          "y": 110,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 180
+        },
+        {
+          "id": "l3-c6",
+          "x": 1700,
+          "y": 280,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 300
+        },
+        {
+          "id": "l3-c7",
+          "x": 1960,
+          "y": 180,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 90
+        },
+        {
+          "id": "l3-c8",
+          "x": 2420,
+          "y": 240,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 150
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch1",
+      "triggers": []
+    },
+    {
+      "id": 4,
+      "name": "Clockwork Rapids",
+      "description": "A sprint through rushing ruins. Reach the safety gate in 10 seconds while time-bonuses from bananas and stars keep you alive.",
+      "startX": 100,
+      "startY": 360,
+      "endX": 2250,
+      "endY": 260,
+      "timeLimit": 10,
+      "collectibleBonusSeconds": 2,
+      "platforms": [
+        {
+          "id": "l4-p1",
+          "x": 50,
+          "y": 410,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l4-p2",
+          "x": 320,
+          "y": 320,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l4-p3",
+          "x": 520,
+          "y": 280,
+          "width": 190,
+          "height": 35,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 520,
+          "startY": 280,
+          "range": 190,
+          "speed": 2.4
+        },
+        {
+          "id": "l4-p4",
+          "x": 780,
+          "y": 360,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l4-p5",
+          "x": 980,
+          "y": 420,
+          "width": 260,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l4-p6",
+          "x": 1300,
+          "y": 300,
+          "width": 140,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 1300,
+          "startY": 300,
+          "range": 170,
+          "speed": 1.8
+        },
+        {
+          "id": "l4-p7",
+          "x": 1520,
+          "y": 240,
+          "width": 180,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l4-p8",
+          "x": 1750,
+          "y": 380,
+          "width": 220,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l4-p9",
+          "x": 1980,
+          "y": 320,
+          "width": 170,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l4-p10",
+          "x": 2140,
+          "y": 280,
+          "width": 160,
+          "height": 40,
+          "type": "jungle_brick"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l4-t1",
+          "x": 640,
+          "y": 260,
+          "width": 44,
+          "height": 24,
+          "springForce": 19,
+          "color": "#38bdf8",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l4-t2",
+          "x": 1470,
+          "y": 220,
+          "width": 44,
+          "height": 24,
+          "springForce": 22,
+          "color": "#f97316",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l4-t3",
+          "x": 2060,
+          "y": 300,
+          "width": 44,
+          "height": 24,
+          "springForce": 21,
+          "color": "#7c3aed",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l4-c1",
+          "x": 180,
+          "y": 330,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l4-c2",
+          "x": 420,
+          "y": 230,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 140
+        },
+        {
+          "id": "l4-c3",
+          "x": 860,
+          "y": 330,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 85
+        },
+        {
+          "id": "l4-c4",
+          "x": 1180,
+          "y": 260,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 220
+        },
+        {
+          "id": "l4-c5",
+          "x": 1710,
+          "y": 200,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 50
+        },
+        {
+          "id": "l4-c6",
+          "x": 1960,
+          "y": 260,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 310
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch1",
+      "triggers": []
+    },
+    {
+      "id": 5,
+      "name": "Elephant Patrol Path",
+      "description": "March along the old elephant trail before the clock runs out! Grab fruit on the way to keep your time bank topped up.",
+      "startX": 100,
+      "startY": 350,
+      "endX": 2000,
+      "endY": 280,
+      "timeLimit": 12,
+      "collectibleBonusSeconds": 2,
+      "platforms": [
+        {
+          "id": "l5-p1",
+          "x": 50,
+          "y": 410,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l5-p2",
+          "x": 330,
+          "y": 340,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l5-p3",
+          "x": 560,
+          "y": 410,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l5-p4",
+          "x": 820,
+          "y": 320,
+          "width": 150,
+          "height": 35,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 820,
+          "startY": 320,
+          "range": 150,
+          "speed": 2.2
+        },
+        {
+          "id": "l5-p5",
+          "x": 1080,
+          "y": 380,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l5-p6",
+          "x": 1340,
+          "y": 300,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l5-p7",
+          "x": 1600,
+          "y": 360,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l5-p8",
+          "x": 1860,
+          "y": 280,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l5-t1",
+          "x": 650,
+          "y": 390,
+          "width": 44,
+          "height": 24,
+          "springForce": 16,
+          "color": "#a3e635",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l5-t2",
+          "x": 1750,
+          "y": 340,
+          "width": 44,
+          "height": 24,
+          "springForce": 18,
+          "color": "#38bdf8",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l5-c1",
+          "x": 180,
+          "y": 330,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l5-c2",
+          "x": 400,
+          "y": 260,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 100
+        },
+        {
+          "id": "l5-c3",
+          "x": 900,
+          "y": 250,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 50
+        },
+        {
+          "id": "l5-c4",
+          "x": 1380,
+          "y": 220,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 150
+        },
+        {
+          "id": "l5-c5",
+          "x": 1650,
+          "y": 280,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 200
+        },
+        {
+          "id": "l5-c6",
+          "x": 1950,
+          "y": 230,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 80
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": []
+    },
+    {
+      "id": 6,
+      "name": "Kaa's Hypnotic Hollow",
+      "description": "A swaying cave of vines and hidden coils. Keep moving before the hypnotic mist catches up with the clock!",
+      "startX": 100,
+      "startY": 320,
+      "endX": 2100,
+      "endY": 260,
+      "timeLimit": 14,
+      "collectibleBonusSeconds": 2,
+      "platforms": [
+        {
+          "id": "l6-p1",
+          "x": 50,
+          "y": 400,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l6-p2",
+          "x": 320,
+          "y": 330,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves",
+          "moving": true,
+          "startX": 320,
+          "startY": 280,
+          "range": 90,
+          "speed": 1.6
+        },
+        {
+          "id": "l6-p3",
+          "x": 560,
+          "y": 420,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l6-p4",
+          "x": 800,
+          "y": 320,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 800,
+          "startY": 320,
+          "range": 170,
+          "speed": 2.6
+        },
+        {
+          "id": "l6-p5",
+          "x": 1080,
+          "y": 400,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l6-p6",
+          "x": 1340,
+          "y": 300,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l6-p7",
+          "x": 1600,
+          "y": 380,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l6-p8",
+          "x": 1860,
+          "y": 300,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l6-p9",
+          "x": 2080,
+          "y": 280,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l6-t1",
+          "x": 1700,
+          "y": 360,
+          "width": 44,
+          "height": 24,
+          "springForce": 19,
+          "color": "#14b8a6",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l6-t2",
+          "x": 1950,
+          "y": 360,
+          "width": 44,
+          "height": 24,
+          "springForce": 18,
+          "color": "#22c55e",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l6-c1",
+          "x": 180,
+          "y": 340,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l6-c2",
+          "x": 420,
+          "y": 230,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 90
+        },
+        {
+          "id": "l6-c3",
+          "x": 860,
+          "y": 260,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 170
+        },
+        {
+          "id": "l6-c4",
+          "x": 1150,
+          "y": 230,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 40
+        },
+        {
+          "id": "l6-c5",
+          "x": 1420,
+          "y": 210,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 260
+        },
+        {
+          "id": "l6-c6",
+          "x": 1980,
+          "y": 220,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 120
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": []
+    },
+    {
+      "id": 7,
+      "name": "Bandar-Log Temple Riddle",
+      "description": "Stone monkey idols guard the ruined temple gate. Only someone who truly knows Mowgli's story can answer the riddle and pass.",
+      "startX": 100,
+      "startY": 340,
+      "endX": 1950,
+      "endY": 280,
+      "timeLimit": 16,
+      "collectibleBonusSeconds": 2,
+      "platforms": [
+        {
+          "id": "l7-p1",
+          "x": 50,
+          "y": 410,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l7-p2",
+          "x": 310,
+          "y": 330,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l7-p3",
+          "x": 560,
+          "y": 400,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l7-p4",
+          "x": 800,
+          "y": 320,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 800,
+          "startY": 320,
+          "range": 150,
+          "speed": 2.3
+        },
+        {
+          "id": "l7-p5",
+          "x": 1050,
+          "y": 380,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l7-p6",
+          "x": 1320,
+          "y": 300,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l7-p7",
+          "x": 1580,
+          "y": 380,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l7-p8",
+          "x": 1830,
+          "y": 280,
+          "width": 220,
+          "height": 40,
+          "type": "jungle_brick"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l7-t1",
+          "x": 1450,
+          "y": 360,
+          "width": 44,
+          "height": 24,
+          "springForce": 18,
+          "color": "#f59e0b",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l7-t2",
+          "x": 1700,
+          "y": 360,
+          "width": 44,
+          "height": 24,
+          "springForce": 19,
+          "color": "#fb923c",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l7-c1",
+          "x": 180,
+          "y": 330,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l7-c2",
+          "x": 420,
+          "y": 260,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 80
+        },
+        {
+          "id": "l7-c3",
+          "x": 1120,
+          "y": 310,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 150
+        },
+        {
+          "id": "l7-c4",
+          "x": 1380,
+          "y": 230,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 60
+        },
+        {
+          "id": "l7-c5",
+          "x": 1620,
+          "y": 310,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 200
+        },
+        {
+          "id": "l7-c6",
+          "x": 1900,
+          "y": 230,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 100
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": [
+        {
+          "id": "m7-tr1",
+          "kind": "quiz",
+          "refId": "bandar-riddle",
+          "triggerX": 1010
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "name": "Shere Khan's Scorched Trail",
+      "description": "The dry season jungle crackles underfoot. Stay fast and light-footed — lingering here is never safe.",
+      "startX": 100,
+      "startY": 350,
+      "endX": 2150,
+      "endY": 270,
+      "timeLimit": 17,
+      "collectibleBonusSeconds": 2,
+      "platforms": [
+        {
+          "id": "l8-p1",
+          "x": 50,
+          "y": 410,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l8-p2",
+          "x": 300,
+          "y": 330,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 300,
+          "startY": 330,
+          "range": 140,
+          "speed": 2.6
+        },
+        {
+          "id": "l8-p3",
+          "x": 560,
+          "y": 400,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l8-p4",
+          "x": 800,
+          "y": 310,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves",
+          "moving": true,
+          "startX": 800,
+          "startY": 260,
+          "range": 100,
+          "speed": 1.9
+        },
+        {
+          "id": "l8-p5",
+          "x": 1050,
+          "y": 390,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l8-p6",
+          "x": 1320,
+          "y": 300,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l8-p7",
+          "x": 1580,
+          "y": 370,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l8-p8",
+          "x": 1840,
+          "y": 290,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l8-p9",
+          "x": 2050,
+          "y": 270,
+          "width": 220,
+          "height": 40,
+          "type": "jungle_brick"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l8-t1",
+          "x": 1230,
+          "y": 370,
+          "width": 44,
+          "height": 24,
+          "springForce": 20,
+          "color": "#ef4444",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l8-t2",
+          "x": 1740,
+          "y": 350,
+          "width": 44,
+          "height": 24,
+          "springForce": 21,
+          "color": "#f97316",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l8-c1",
+          "x": 180,
+          "y": 330,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l8-c2",
+          "x": 460,
+          "y": 260,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 90
+        },
+        {
+          "id": "l8-c3",
+          "x": 900,
+          "y": 230,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 40
+        },
+        {
+          "id": "l8-c4",
+          "x": 1380,
+          "y": 220,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 160
+        },
+        {
+          "id": "l8-c5",
+          "x": 1650,
+          "y": 290,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 210
+        },
+        {
+          "id": "l8-c6",
+          "x": 1980,
+          "y": 220,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 70
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": []
+    },
+    {
+      "id": 9,
+      "name": "Monsoon Falls Sprint",
+      "description": "Rain hammers the canopy and the rivers rise fast. Cross the swinging vine bridges before the falls catch up!",
+      "startX": 100,
+      "startY": 340,
+      "endX": 2200,
+      "endY": 260,
+      "timeLimit": 20,
+      "collectibleBonusSeconds": 3,
+      "platforms": [
+        {
+          "id": "l9-p1",
+          "x": 50,
+          "y": 410,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l9-p1b",
+          "x": 290,
+          "y": 400,
+          "width": 120,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l9-p2",
+          "x": 460,
+          "y": 320,
+          "width": 170,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 460,
+          "startY": 320,
+          "range": 90,
+          "speed": 2
+        },
+        {
+          "id": "l9-p3",
+          "x": 520,
+          "y": 380,
+          "width": 230,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l9-p4",
+          "x": 770,
+          "y": 320,
+          "width": 200,
+          "height": 30,
+          "type": "vine_bridge"
+        },
+        {
+          "id": "l9-p5",
+          "x": 1080,
+          "y": 390,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l9-p6",
+          "x": 1340,
+          "y": 300,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l9-p7",
+          "x": 1600,
+          "y": 370,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l9-p8",
+          "x": 1860,
+          "y": 290,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves",
+          "moving": true,
+          "startX": 1860,
+          "startY": 250,
+          "range": 80,
+          "speed": 2
+        },
+        {
+          "id": "l9-p9",
+          "x": 2090,
+          "y": 260,
+          "width": 220,
+          "height": 40,
+          "type": "moss_log"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l9-t1",
+          "x": 1230,
+          "y": 370,
+          "width": 44,
+          "height": 24,
+          "springForce": 15,
+          "color": "#22d3ee",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l9-t2",
+          "x": 1740,
+          "y": 350,
+          "width": 44,
+          "height": 24,
+          "springForce": 20,
+          "color": "#3b82f6",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l9-c1",
+          "x": 180,
+          "y": 320,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l9-c2",
+          "x": 430,
+          "y": 240,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 70
+        },
+        {
+          "id": "l9-c3",
+          "x": 920,
+          "y": 230,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 140
+        },
+        {
+          "id": "l9-c4",
+          "x": 1180,
+          "y": 220,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 50
+        },
+        {
+          "id": "l9-c5",
+          "x": 1700,
+          "y": 280,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 190
+        },
+        {
+          "id": "l9-c6",
+          "x": 2020,
+          "y": 210,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 110
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": []
+    },
+    {
+      "id": 10,
+      "name": "Man-Village Homecoming",
+      "description": "The final stretch! Race through the last ruins toward the lights of the man-village before time runs out. Mowgli's journey ends here.",
+      "startX": 100,
+      "startY": 340,
+      "endX": 2400,
+      "endY": 260,
+      "timeLimit": 20,
+      "collectibleBonusSeconds": 3,
+      "platforms": [
+        {
+          "id": "l10-p1",
+          "x": 50,
+          "y": 410,
+          "width": 200,
+          "height": 40,
+          "type": "moss_log"
+        },
+        {
+          "id": "l10-p2",
+          "x": 300,
+          "y": 320,
+          "width": 150,
+          "height": 30,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l10-p3",
+          "x": 550,
+          "y": 390,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l10-p4",
+          "x": 800,
+          "y": 300,
+          "width": 150,
+          "height": 30,
+          "type": "vine_bridge",
+          "moving": true,
+          "startX": 800,
+          "startY": 300,
+          "range": 160,
+          "speed": 2.6
+        },
+        {
+          "id": "l10-p5",
+          "x": 1060,
+          "y": 380,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l10-p6",
+          "x": 1330,
+          "y": 290,
+          "width": 150,
+          "height": 35,
+          "type": "canopy_leaves",
+          "moving": true,
+          "startX": 1330,
+          "startY": 250,
+          "range": 90,
+          "speed": 2
+        },
+        {
+          "id": "l10-p7",
+          "x": 1590,
+          "y": 370,
+          "width": 180,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l10-p8",
+          "x": 1850,
+          "y": 290,
+          "width": 160,
+          "height": 35,
+          "type": "canopy_leaves"
+        },
+        {
+          "id": "l10-p9",
+          "x": 2090,
+          "y": 360,
+          "width": 200,
+          "height": 40,
+          "type": "jungle_brick"
+        },
+        {
+          "id": "l10-p10",
+          "x": 2330,
+          "y": 280,
+          "width": 250,
+          "height": 40,
+          "type": "moss_log"
+        }
+      ],
+      "toads": [
+        {
+          "id": "l10-t1",
+          "x": 1240,
+          "y": 360,
+          "width": 44,
+          "height": 24,
+          "springForce": 21,
+          "color": "#facc15",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l10-t2",
+          "x": 1760,
+          "y": 350,
+          "width": 44,
+          "height": 24,
+          "springForce": 22,
+          "color": "#4ade80",
+          "isSquished": false,
+          "squishTimer": 0
+        },
+        {
+          "id": "l10-t3",
+          "x": 2200,
+          "y": 340,
+          "width": 44,
+          "height": 24,
+          "springForce": 20,
+          "color": "#ec4899",
+          "isSquished": false,
+          "squishTimer": 0
+        }
+      ],
+      "collectibles": [
+        {
+          "id": "l10-c1",
+          "x": 180,
+          "y": 320,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 0
+        },
+        {
+          "id": "l10-c2",
+          "x": 420,
+          "y": 230,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 80
+        },
+        {
+          "id": "l10-c3",
+          "x": 900,
+          "y": 220,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 150
+        },
+        {
+          "id": "l10-c4",
+          "x": 1180,
+          "y": 210,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 40
+        },
+        {
+          "id": "l10-c5",
+          "x": 1450,
+          "y": 200,
+          "type": "mango",
+          "collected": false,
+          "bobOffset": 220
+        },
+        {
+          "id": "l10-c6",
+          "x": 1700,
+          "y": 280,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 100
+        },
+        {
+          "id": "l10-c7",
+          "x": 1980,
+          "y": 260,
+          "type": "star",
+          "collected": false,
+          "bobOffset": 180
+        },
+        {
+          "id": "l10-c8",
+          "x": 2350,
+          "y": 230,
+          "type": "banana",
+          "collected": false,
+          "bobOffset": 60
+        }
+      ],
+      "type": "platformer",
+      "chapter": "ch2",
+      "triggers": [
+        {
+          "id": "m10-tr1",
+          "kind": "fight",
+          "refId": "shere-khan-final",
+          "triggerX": 2250,
+          "chapterCard": "epilogue"
+        }
+      ]
+    }
+  ],
+  "fights": [
+    {
+      "id": "shere-khan-final",
+      "name": "The Final Reckoning",
+      "description": "Years later, a grown Mowgli returns to the village with fire in hand. Shere Khan stalks in for one last duel before the watching villagers. End it.",
+      "background": "village",
+      "player": {
+        "sprite": "mowgli_torch",
+        "maxHp": 100,
+        "damage": 20,
+        "parryChance": 0
+      },
+      "opponent": {
+        "sprite": "shere_khan",
+        "maxHp": 100,
+        "damage": 20,
+        "parryChance": 0.2
+      },
+      "restartOnLose": true
+    }
+  ],
+  "quizzes": [
+    {
+      "id": "bandar-riddle",
+      "title": "The Bandar-Log Riddle Gate",
+      "intro": "Ancient stone monkeys block the path forward. They will only move aside for someone who truly knows Mowgli's tale — answer all questions correctly to pass!",
+      "questionCount": 3,
+      "cs": {
+        "title": "Hádanková Brána Bandar-Logů",
+        "intro": "Starobylé kamenné opice blokují cestu. Uhnou jen tomu, kdo skutečně zná příběh Mauglího — odpověz správně na všechny otázky, abys mohl projít!"
+      }
+    }
+  ],
+  "questionPool": [
+    {
+      "id": "bandar-riddle-q1",
+      "chapter": "ch2",
+      "question": "Who is the wise black panther who finds baby Mowgli and brings him to the wolf pack?",
+      "choices": [
+        "Baloo",
+        "Bagheera",
+        "Kaa",
+        "Akela"
+      ],
+      "correctIndex": 1,
+      "cs": {
+        "question": "Kdo je mudrc, černý panter, který najde malého Mauglího a přivede ho k smečce vlků?",
+        "choices": [
+          "Balú",
+          "Baghíra",
+          "Kaa",
+          "Akela"
+        ]
+      }
+    },
+    {
+      "id": "bandar-riddle-q2",
+      "chapter": "ch2",
+      "question": "Which laid-back bear teaches Mowgli about \"The Bare Necessities\"?",
+      "choices": [
+        "Baloo",
+        "Shere Khan",
+        "Colonel Hathi",
+        "Bagheera"
+      ],
+      "correctIndex": 0,
+      "cs": {
+        "question": "Který pohodový medvěd učí Mauglího o tom, co je v životě opravdu potřeba?",
+        "choices": [
+          "Balú",
+          "Šér Chán",
+          "Plukovník Hathi",
+          "Baghíra"
+        ]
+      }
+    },
+    {
+      "id": "bandar-riddle-q3",
+      "chapter": "ch2",
+      "question": "Which tiger wants to hunt Mowgli because he fears and hates Man?",
+      "choices": [
+        "Kaa",
+        "King Louie",
+        "Shere Khan",
+        "Akela"
+      ],
+      "correctIndex": 2,
+      "cs": {
+        "question": "Který tygr chce Mauglího ulovit, protože se bojí a nenávidí lidi?",
+        "choices": [
+          "Kaa",
+          "Král Louie",
+          "Šér Chán",
+          "Akela"
+        ]
+      }
+    }
+  ],
+  "sprites": [
+    {
+      "id": "moss_log",
+      "name": "Moss Log",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/block-moss-log.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "jungle_brick",
+      "name": "Jungle Brick",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/block-jungle-brick.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "vine_bridge",
+      "name": "Vine Bridge",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/block-vine-bridge.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "canopy_leaves",
+      "name": "Canopy Leaves",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/block-canopy-leaves.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "toad",
+      "name": "Spring Toad",
+      "kind": "block",
+      "width": 44,
+      "height": 24,
+      "frames": [
+        "/assets/sprites/toad-1.png",
+        "/assets/sprites/toad-2.png"
+      ],
+      "frameDuration": 320
+    },
+    {
+      "id": "banana",
+      "name": "Banana",
+      "kind": "block",
+      "width": 26,
+      "height": 26,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "mango",
+      "name": "Mango",
+      "kind": "block",
+      "width": 22,
+      "height": 28,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "star",
+      "name": "Golden Star",
+      "kind": "block",
+      "width": 26,
+      "height": 26,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "portal",
+      "name": "Safety Portal",
+      "kind": "block",
+      "width": 96,
+      "height": 90,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "jungle_tree",
+      "name": "Tall Tree",
+      "kind": "block",
+      "width": 80,
+      "height": 183,
+      "frames": [
+        "/assets/sprites/prop-tree-tall.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "round_tree",
+      "name": "Round Tree",
+      "kind": "block",
+      "width": 92,
+      "height": 151,
+      "frames": [
+        "/assets/sprites/prop-tree-round.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "tree_stump",
+      "name": "Tree Stump",
+      "kind": "block",
+      "width": 50,
+      "height": 40,
+      "frames": [
+        "/assets/sprites/prop-stump.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "jungle_sprig",
+      "name": "Jungle Sprig",
+      "kind": "block",
+      "width": 54,
+      "height": 60,
+      "frames": [
+        "/assets/sprites/prop-sprig.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "flower_blue",
+      "name": "Blue Flower",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/prop-flower-blue.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "flower_red",
+      "name": "Red Flower",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/prop-flower-red.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "flower_yellow",
+      "name": "Yellow Flower",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/prop-flower-yellow.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "mowgli",
+      "name": "Mowgli",
+      "kind": "character",
+      "width": 30,
+      "height": 50,
+      "frames": [
+        "/assets/sprites/mowgli-1.png",
+        "/assets/sprites/mowgli-2.png",
+        "/assets/sprites/mowgli-3.png",
+        "/assets/sprites/mowgli-4.png"
+      ],
+      "frameDuration": 110
+    },
+    {
+      "id": "baby_mowgli",
+      "name": "Baby Mowgli",
+      "kind": "character",
+      "width": 30,
+      "height": 20,
+      "frames": [
+        "/assets/sprites/baby-mowgli-1.png",
+        "/assets/sprites/baby-mowgli-2.png",
+        "/assets/sprites/baby-mowgli-3.png",
+        "/assets/sprites/baby-mowgli-4.png"
+      ],
+      "frameDuration": 130
+    },
+    {
+      "id": "tiger",
+      "name": "Shere Khan (Prowling)",
+      "kind": "character",
+      "width": 140,
+      "height": 90,
+      "frames": [
+        "/assets/sprites/tiger-1.png",
+        "/assets/sprites/tiger-2.png",
+        "/assets/sprites/tiger-3.png",
+        "/assets/sprites/tiger-4.png"
+      ],
+      "frameDuration": 160
+    },
+    {
+      "id": "mowgli_torch",
+      "name": "Mowgli (Torch Duel)",
+      "kind": "character",
+      "width": 90,
+      "height": 115,
+      "frames": [
+        "/assets/sprites/mowgli-torch-1.png",
+        "/assets/sprites/mowgli-torch-2.png",
+        "/assets/sprites/mowgli-torch-3.png",
+        "/assets/sprites/mowgli-torch-4.png"
+      ],
+      "frameDuration": 170
+    },
+    {
+      "id": "shere_khan",
+      "name": "Shere Khan (Duel)",
+      "kind": "character",
+      "width": 160,
+      "height": 115,
+      "frames": [
+        "/assets/sprites/shere-khan-1.png",
+        "/assets/sprites/shere-khan-2.png",
+        "/assets/sprites/shere-khan-3.png",
+        "/assets/sprites/shere-khan-4.png"
+      ],
+      "frameDuration": 170
+    },
+    {
+      "id": "night_moss_log",
+      "name": "Moss Log (Night)",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/night/block-moss-log.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_jungle_brick",
+      "name": "Jungle Brick (Night)",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/night/block-jungle-brick.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_vine_bridge",
+      "name": "Vine Bridge (Night)",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/night/block-vine-bridge.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_canopy_leaves",
+      "name": "Canopy Leaves (Night)",
+      "kind": "block",
+      "width": 160,
+      "height": 35,
+      "frames": [
+        "/assets/sprites/night/block-canopy-leaves.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_toad",
+      "name": "Spring Toad (Night)",
+      "kind": "block",
+      "width": 44,
+      "height": 24,
+      "frames": [
+        "/assets/sprites/night/toad-1.png",
+        "/assets/sprites/night/toad-2.png"
+      ],
+      "frameDuration": 320
+    },
+    {
+      "id": "night_banana",
+      "name": "Banana (Night)",
+      "kind": "block",
+      "width": 26,
+      "height": 26,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_mango",
+      "name": "Mango (Night)",
+      "kind": "block",
+      "width": 22,
+      "height": 28,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_star",
+      "name": "Golden Star (Night)",
+      "kind": "block",
+      "width": 26,
+      "height": 26,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_portal",
+      "name": "Safety Portal (Night)",
+      "kind": "block",
+      "width": 96,
+      "height": 90,
+      "frames": [],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_jungle_tree",
+      "name": "Tall Tree (Night)",
+      "kind": "block",
+      "width": 80,
+      "height": 183,
+      "frames": [
+        "/assets/sprites/night/prop-tree-tall.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_round_tree",
+      "name": "Round Tree (Night)",
+      "kind": "block",
+      "width": 92,
+      "height": 151,
+      "frames": [
+        "/assets/sprites/night/prop-tree-round.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_tree_stump",
+      "name": "Tree Stump (Night)",
+      "kind": "block",
+      "width": 50,
+      "height": 40,
+      "frames": [
+        "/assets/sprites/night/prop-stump.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_jungle_sprig",
+      "name": "Jungle Sprig (Night)",
+      "kind": "block",
+      "width": 54,
+      "height": 60,
+      "frames": [
+        "/assets/sprites/night/prop-sprig.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_flower_blue",
+      "name": "Blue Flower (Night)",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/night/prop-flower-blue.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_flower_red",
+      "name": "Red Flower (Night)",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/night/prop-flower-red.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_flower_yellow",
+      "name": "Yellow Flower (Night)",
+      "kind": "block",
+      "width": 48,
+      "height": 28,
+      "frames": [
+        "/assets/sprites/night/prop-flower-yellow.png"
+      ],
+      "frameDuration": 140
+    },
+    {
+      "id": "night_mowgli",
+      "name": "Mowgli (Night)",
+      "kind": "character",
+      "width": 30,
+      "height": 50,
+      "frames": [
+        "/assets/sprites/night/mowgli-1.png",
+        "/assets/sprites/night/mowgli-2.png",
+        "/assets/sprites/night/mowgli-3.png",
+        "/assets/sprites/night/mowgli-4.png"
+      ],
+      "frameDuration": 110
+    },
+    {
+      "id": "night_baby_mowgli",
+      "name": "Baby Mowgli (Night)",
+      "kind": "character",
+      "width": 30,
+      "height": 20,
+      "frames": [
+        "/assets/sprites/night/baby-mowgli-1.png",
+        "/assets/sprites/night/baby-mowgli-2.png",
+        "/assets/sprites/night/baby-mowgli-3.png",
+        "/assets/sprites/night/baby-mowgli-4.png"
+      ],
+      "frameDuration": 130
+    },
+    {
+      "id": "night_tiger",
+      "name": "Shere Khan (Prowling) (Night)",
+      "kind": "character",
+      "width": 140,
+      "height": 90,
+      "frames": [
+        "/assets/sprites/night/tiger-1.png",
+        "/assets/sprites/night/tiger-2.png",
+        "/assets/sprites/night/tiger-3.png",
+        "/assets/sprites/night/tiger-4.png"
+      ],
+      "frameDuration": 160
+    },
+    {
+      "id": "night_mowgli_torch",
+      "name": "Mowgli (Torch Duel) (Night)",
+      "kind": "character",
+      "width": 90,
+      "height": 115,
+      "frames": [
+        "/assets/sprites/night/mowgli-torch-1.png",
+        "/assets/sprites/night/mowgli-torch-2.png",
+        "/assets/sprites/night/mowgli-torch-3.png",
+        "/assets/sprites/night/mowgli-torch-4.png"
+      ],
+      "frameDuration": 170
+    },
+    {
+      "id": "night_shere_khan",
+      "name": "Shere Khan (Duel) (Night)",
+      "kind": "character",
+      "width": 160,
+      "height": 115,
+      "frames": [
+        "/assets/sprites/night/shere-khan-1.png",
+        "/assets/sprites/night/shere-khan-2.png",
+        "/assets/sprites/night/shere-khan-3.png",
+        "/assets/sprites/night/shere-khan-4.png"
+      ],
+      "frameDuration": 170
+    }
+  ]
+}

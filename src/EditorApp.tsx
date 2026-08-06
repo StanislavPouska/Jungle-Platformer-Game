@@ -3,65 +3,78 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { WorldData } from './types';
-import { INITIAL_MISSIONS, INITIAL_FIGHTS, INITIAL_QUIZZES, INITIAL_QUESTIONS, INITIAL_SPRITES } from './data';
 import LevelEditor from './components/LevelEditor';
 import { Lang, UI, LANGUAGES } from './i18n';
-import {
-  readSaveData,
-  writeWorldToSave,
-  scheduleWorldSave,
-  flushWorldSave,
-  mergeWithDefaults,
-  readSavedLang,
-  LANG_KEY,
-} from './storage';
-import { SquarePen } from 'lucide-react';
+import { readSavedLang, LANG_KEY } from './storage';
+import { loadWorldFromServer, saveWorldToServer } from './worldFile';
+import { SquarePen, Loader2 } from 'lucide-react';
 
-// Seed the editor's world from the shared save, merged against the built-in
-// set: recovers content an old/partial save is missing while keeping the
-// user's deliberate deletions deleted (knownDefaults tells them apart).
-function seedWorld(): WorldData {
-  const saved = readSaveData();
-  if (!saved?.world?.missions?.length) {
-    return JSON.parse(JSON.stringify({ missions: INITIAL_MISSIONS, fights: INITIAL_FIGHTS, quizzes: INITIAL_QUIZZES, questionPool: INITIAL_QUESTIONS, sprites: INITIAL_SPRITES }));
-  }
-  return mergeWithDefaults(saved.world, saved.knownDefaults);
-}
-
-// Standalone host for the world editor — what editor.exe opens. Shares the
-// game's localStorage save, so missions designed here appear in the game's
-// Load and in one-click Playtest (which navigates to index.html?play=N).
+// Standalone host for the world editor — what editor.exe opens via the local
+// editor server. It reads and writes the game's content file (public/world.json)
+// directly on disk through the server's /api/world endpoint. Missions designed
+// here permanently change the game content; the browser game reads the same
+// file at startup.
 export default function EditorApp() {
   const [language, setLanguage] = useState<Lang>(() => readSavedLang());
-  const [world, setWorld] = useState<WorldData>(seedWorld);
+  const [world, setWorld] = useState<WorldData | null>(null);
   const [savedAt, setSavedAt] = useState<string | null>(null);
   const [saveFailed, setSaveFailed] = useState(false);
   const t = UI[language];
 
-  // Re-stamp the save on mount: persists any content the merge recovered
-  // (or a v1→v2 migration produced) and records knownDefaults so future
-  // deletions of built-ins stay durable.
+  // Debounced file save: every edit schedules a write; the actual POST runs
+  // once edits go quiet. A ref holds the freshest world so a flush always
+  // persists the latest state.
+  const worldRef = useRef<WorldData | null>(null);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const persist = async (next: WorldData) => {
+    const result = await saveWorldToServer(next);
+    setSaveFailed(!result.ok);
+    if (result.ok) setSavedAt(result.savedAt ?? new Date().toISOString());
+  };
+
+  const flush = () => {
+    clearTimeout(saveTimer.current);
+    if (worldRef.current) void persist(worldRef.current);
+  };
+
+  // Load the current game content from disk on mount.
   useEffect(() => {
-    if (readSaveData()) writeWorldToSave(world);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let alive = true;
+    loadWorldFromServer().then((w) => {
+      if (alive) {
+        setWorld(w);
+        worldRef.current = w;
+      }
+    });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  // Autosaves are debounced — push any pending write out before the page
-  // closes so the last edits aren't lost.
+  // Flush any pending write before the page closes.
   useEffect(() => {
-    const flush = () => flushWorldSave();
-    window.addEventListener('beforeunload', flush);
-    return () => window.removeEventListener('beforeunload', flush);
+    const onUnload = () => {
+      // Best-effort synchronous flush via sendBeacon so the last edits land.
+      if (worldRef.current) {
+        try {
+          navigator.sendBeacon('/api/world', new Blob([JSON.stringify(worldRef.current)], { type: 'application/json' }));
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+    window.addEventListener('beforeunload', onUnload);
+    return () => window.removeEventListener('beforeunload', onUnload);
   }, []);
 
   const handleWorldChange = (next: WorldData) => {
     setWorld(next);
-    scheduleWorldSave(next, (data) => {
-      setSavedAt(data?.savedAt ?? null);
-      setSaveFailed(data === null);
-    });
+    worldRef.current = next;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => void persist(next), 600);
   };
 
   const handleLanguageChange = (lang: Lang) => {
@@ -73,17 +86,28 @@ export default function EditorApp() {
     }
   };
 
-  const handlePlaytest = (idx: number) => {
-    // Persist exactly the current state, then hand off to the game.
-    scheduleWorldSave(world);
-    flushWorldSave();
+  // Explicit Save: force the pending write out immediately.
+  const handleSave = () => {
+    flush();
+  };
+
+  const handlePlaytest = async (idx: number) => {
+    // Persist to disk first, then hand off to the game (which reads the file).
+    clearTimeout(saveTimer.current);
+    if (worldRef.current) await persist(worldRef.current);
     window.location.href = `index.html?play=${idx}`;
   };
 
-  const handleSave = () => {
-    // Force any pending debounced saves to execute immediately
-    flushWorldSave();
-  };
+  if (!world) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-fuchsia-300 font-mono text-sm">
+          <Loader2 className="w-5 h-5 animate-spin" />
+          Loading world…
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#0e0722] via-[#140a2d] to-[#04010a] text-gray-100 font-sans px-4 md:px-6 py-5 select-none">
@@ -100,9 +124,9 @@ export default function EditorApp() {
           </div>
           <div className="flex items-center gap-3">
             {saveFailed ? (
-              <span className="text-[10px] font-mono text-rose-400" id="editor-save-error">⚠ {t.editorSaveFailed}</span>
+              <span className="text-[10px] font-mono text-rose-400" id="editor-save-error">⚠ {t.editorSaveFailedFile}</span>
             ) : savedAt ? (
-              <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorAutosaved}</span>
+              <span className="text-[10px] font-mono text-emerald-400" id="editor-autosave-indicator">● {t.editorSavedToFile}</span>
             ) : null}
             <div className="flex gap-1 bg-[#0d071f] p-1 rounded-xl border border-purple-900/40">
               {LANGUAGES.map((l) => (
