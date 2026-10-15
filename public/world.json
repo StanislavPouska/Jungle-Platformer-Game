@@ -18,7 +18,9 @@
           "x": 30,
           "width": 220,
           "y": 420,
-          "height": 30
+          "height": 30,
+          "extendLeft": true,
+          "extendDown": true
         },
         {
           "id": "sp2",
