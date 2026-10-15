@@ -1,9 +1,11 @@
 // Lightweight launcher for the Mowgli level editor.
 //
-// editor.exe sits in the project root. Double-clicking it starts the local
-// Vite dev server (npm run editor), which serves the standalone editor page and
-// opens it in the default browser. The console window shows the server log;
-// closing it stops the server. Compiled with the Windows built-in csc.exe via
+// editor.exe sits in the project root. Double-clicking it starts the standalone
+// editor server (npm run editor -> node editor-server.mjs), which serves the
+// editor page, opens it in the default browser, and — unlike the browser game —
+// writes level-design edits straight to the game's content file on disk
+// (public/world.json). The console window shows the server log; closing it
+// stops the server. Compiled with the Windows built-in csc.exe via
 // tools/build-editor-exe.ps1 — no external toolchain required.
 
 using System;
